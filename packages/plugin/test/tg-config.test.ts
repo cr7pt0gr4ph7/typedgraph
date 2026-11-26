@@ -38,6 +38,7 @@ function sync(files: Record<string, string>, folder = 'Types/') {
 
 describe('tg config sync', () => {
   // @tg: verifies:: [[tests/schema-notes#Schema folder from tg config#Config file values]] {level: unit}
+  // @lat: [[tests/schema-notes#Schema folder from tg config#Config file values]]
   it('reads a usable schemaFolder and merges a new one keeping other keys', () => {
     expect(schemaFolderOf('{"schemaFolder": "Ontology"}')).toBe('Ontology/');
     expect(schemaFolderOf('{"schemaFolder": "./docs/types/"}')).toBe('docs/types/');
@@ -50,6 +51,7 @@ describe('tg config sync', () => {
   });
 
   // @tg: verifies:: [[tests/schema-notes#Schema folder from tg config#New configuration follows the file]] {level: unit}
+  // @lat: [[tests/schema-notes#Schema folder from tg config#New configuration follows the file]]
   // @tg: verifies:: [[openspec:schema-notes#Schema folder from the project config#New configuration]]
   it('turns sync on for a new configuration when the vault has the file, and starts from its folder', async () => {
     const withFile = sync({ [TG_CONFIG_PATH]: '{"schemaFolder": "Ontology"}' });
@@ -67,6 +69,7 @@ describe('tg config sync', () => {
   });
 
   // @tg: verifies:: [[tests/schema-notes#Schema folder from tg config#Setting change writes the file]] {level: unit}
+  // @lat: [[tests/schema-notes#Schema folder from tg config#Setting change writes the file]]
   // @tg: verifies:: [[openspec:schema-notes#Schema folder from the project config#Two-way sync]]
   it('writes the setting into the file, keeping other keys, and writes nothing when the file already agrees', async () => {
     const { s, data, settings, adapter } = sync({ [TG_CONFIG_PATH]: '{\n  "notes": ["book/**/*.adoc"]\n}\n' }, 'Ontology/');
@@ -89,6 +92,7 @@ describe('tg config sync', () => {
   });
 
   // @tg: verifies:: [[tests/schema-notes#Schema folder from tg config#File change updates the setting]] {level: unit}
+  // @lat: [[tests/schema-notes#Schema folder from tg config#File change updates the setting]]
   // @tg: verifies:: [[openspec:schema-notes#Schema folder from the project config#Two-way sync]]
   it('adopts an outside edit of the file when polled, and only once', async () => {
     const { s, touch, settings, setFolder } = sync({ [TG_CONFIG_PATH]: '{"schemaFolder": "Types"}' });
@@ -108,6 +112,7 @@ describe('tg config sync', () => {
 
 describe('settings tab', () => {
   // @tg: verifies:: [[tests/schema-notes#Schema folder from tg config#Sync toggle in the settings]] {level: unit}
+  // @lat: [[tests/schema-notes#Schema folder from tg config#Sync toggle in the settings]]
   it('offers "Sync .tg/config.json" beside the schema folder, off by default, and routes it through the plugin', async () => {
     const { ObsigraphSettingTab, DEFAULT_SETTINGS } = await import('../src/settings');
     const plugin = {

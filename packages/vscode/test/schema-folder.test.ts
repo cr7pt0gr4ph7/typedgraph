@@ -9,6 +9,7 @@ import { workspace } from './index.test';
 const IDEA = '---\nschemas:\n  Idea: {}\n---\nIdeas.\n';
 
 // @tg: verifies:: [[tests/vscode-extension#Creating notes#Schema folder from tg config]] {level: unit}
+// @lat: [[tests/vscode-extension#Creating notes#Schema folder from tg config]]
 // @tg: verifies:: [[openspec:typed-note-creation#Schema folder in VS Code#Config by default]]
 it('reads the schema folder from .tg/config.json, again on every call, and Types/ without one', async () => {
   const dir = workspace({ '.tg/config.json': '{"notes": [], "schemaFolder": "Ontology"}', 'Ontology/Idea.md': IDEA });
@@ -25,6 +26,7 @@ it('reads the schema folder from .tg/config.json, again on every call, and Types
 });
 
 // @tg: verifies:: [[tests/vscode-extension#Creating notes#Setting overrides the config]] {level: unit}
+// @lat: [[tests/vscode-extension#Creating notes#Setting overrides the config]]
 // @tg: verifies:: [[openspec:typed-note-creation#Schema folder in VS Code#Setting overrides]]
 it('lets a typegraph.schemaFolder the user set override the config, and refuses values outside the workspace', () => {
   const dir = workspace({ '.tg/config.json': '{"schemaFolder": "Ontology"}' });

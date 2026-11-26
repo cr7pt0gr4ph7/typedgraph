@@ -50,6 +50,7 @@ const DOCS = {
 
 describe('schema folder resolution', () => {
   // @tg: verifies:: [[tests/cli-core#Schema folder#Flag over config over default]] {level: unit}
+  // @lat: [[tests/cli-core#Schema folder#Flag over config over default]]
   // @tg: verifies:: [[openspec:tg-cli#Schema folder#Flag over config over default]]
   it('takes --schema-folder, else schemaFolder in .tg/config.json, else Types/', () => {
     const plain = project({});
@@ -63,6 +64,7 @@ describe('schema folder resolution', () => {
   });
 
   // @tg: verifies:: [[tests/cli-core#Schema folder#Broken config key]] {level: unit}
+  // @lat: [[tests/cli-core#Schema folder#Broken config key]]
   it('reports a broken schemaFolder without losing the notes globs', () => {
     const dir = project({ '.tg/config.json': '{"notes": ["book/**/*.adoc"], "schemaFolder": 3}' });
     const { config, error } = readConfig(dir);
@@ -72,6 +74,7 @@ describe('schema folder resolution', () => {
   });
 
   // @tg: verifies:: [[tests/cli-core#Schema folder#Schema text follows the folder]] {level: unit}
+  // @lat: [[tests/cli-core#Schema folder#Schema text follows the folder]]
   it('rewrites Types/ in template text only where it names the folder', () => {
     expect(forSchema('the schema in `Types/code-types.md`, from Types/', 'Ontology/')).toBe('the schema in `Ontology/code-types.md`, from Ontology/');
     expect(forSchema('MyTypes/ and a/Types/ stay', 'Ontology/')).toBe('MyTypes/ and a/Types/ stay');
@@ -81,6 +84,7 @@ describe('schema folder resolution', () => {
 
 describe('commands that read the schema', () => {
   // @tg: verifies:: [[tests/cli-core#Schema folder#Reading commands]] {level: integration}
+  // @lat: [[tests/cli-core#Schema folder#Reading commands]]
   // @tg: verifies:: [[openspec:tg-cli#Schema folder#Every reading command]]
   it('cypher, ontology, validate, schema export and migrate read the configured folder, and the flag overrides it', async () => {
     const dir = project({ ...DOCS, 'Ontology/code-types.md': SCHEMA, '.tg/config.json': '{"schemaFolder": "Ontology"}' });
@@ -105,6 +109,7 @@ describe('commands that read the schema', () => {
   });
 
   // @tg: verifies:: [[tests/cli-core#Schema folder#Bad flag value]] {level: integration}
+  // @lat: [[tests/cli-core#Schema folder#Bad flag value]]
   // @tg: verifies:: [[openspec:tg-cli#Schema folder#Folder outside the project]]
   it('refuses a schema folder outside the project in every command that takes the flag', async () => {
     const dir = project({ ...DOCS, 'Types/code-types.md': SCHEMA });
@@ -119,6 +124,7 @@ describe('commands that read the schema', () => {
 
 describe('init and upgrade', () => {
   // @tg: verifies:: [[tests/tg-agent#Schema folder choice#Init into another folder]] {level: integration}
+  // @lat: [[tests/tg-agent#Schema folder choice#Init into another folder]]
   // @tg: verifies:: [[openspec:tg-agent-integration#Schema folder choice#Init into another folder]]
   it('init --schema-folder writes the ontology there, names it in the instructions and records it in .tg/config.json', async () => {
     const dir = project({});
@@ -143,6 +149,7 @@ describe('init and upgrade', () => {
   });
 
   // @tg: verifies:: [[tests/tg-agent#Schema folder choice#Default folder writes no config]] {level: integration}
+  // @lat: [[tests/tg-agent#Schema folder choice#Default folder writes no config]]
   // @tg: verifies:: [[openspec:tg-agent-integration#Schema folder choice#Default folder writes no config]]
   it('init without the flag, or with the default folder, writes no .tg/config.json; a new value keeps other keys', async () => {
     const plain = project({});
@@ -158,6 +165,7 @@ describe('init and upgrade', () => {
   });
 
   // @tg: verifies:: [[tests/tg-upgrade#Schema folder]] {level: integration}
+  // @lat: [[tests/tg-upgrade#Schema folder]]
   // @tg: verifies:: [[openspec:tg-agent-integration#Schema folder choice#Upgrade follows the folder]]
   it('upgrade refreshes the ontology in the configured folder and records a folder given with the flag', async () => {
     const dir = project({});
