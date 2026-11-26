@@ -9,7 +9,7 @@ Test specifications for the published Typed Graph Schema specification, its JSON
 
 ## Conformance examples pass
 
-Every example in `spec/tgs/examples` gives the expected declarations and diagnostics through the reader and validator, the expected SHACL where present, and the expected JSON Schema result per note.
+Every example in `spec/tgs/examples` gives the expected declarations and diagnostics through the reader and validator, the expected SHACL and OWL where present, and the expected JSON Schema result per note.
 
 ## Spec examples validate
 
@@ -33,7 +33,11 @@ The specification, JSON Schema `$id` and site build name 0.3 as the current vers
 
 ## Version 0.6 published at typedgraph.org
 
-`SPEC.md` is 0.6 with its version address and `tgs:` namespace under typedgraph.org, the JSON Schema `$id` is the typedgraph.org address, the site build publishes 0.6, and archived 0.5 keeps its former addresses.
+Archived 0.6 keeps its version address, JSON Schema `$id` and `tgs:` namespace under typedgraph.org, and archived 0.5 keeps its former addresses.
+
+## Version 0.7 published with the OWL mapping
+
+`SPEC.md` is 0.7 with section 14, the OWL mapping, and an OWL exporter conformance level; the JSON Schema `$id` and the site build name 0.7, and archived 0.6 has no OWL mapping.
 
 ## Former namespace imports unchanged
 

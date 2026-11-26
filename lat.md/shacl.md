@@ -1,18 +1,18 @@
 ---
 type: Decision
-openspec: [shacl-interop, tgs-spec]
+openspec: [shacl-interop, tgs-spec, owl-export]
 ---
 # SHACL
 
-Exchange of schemas with the RDF world: export of schema notes as W3C SHACL, import of SHACL shapes into schema notes, and the open Typed Graph Schema specification both are defined by.
+Exchange of schemas with the RDF world: export of schema notes as W3C SHACL and OWL 2, import of SHACL shapes into schema notes, and the open Typed Graph Schema specification that defines them.
 
 The schema format is described in [[graph-model#Schema notes]]; this file covers the mapping to SHACL and the specification that publishes it.
 
 ## Typed Graph Schema
 
-TGS 0.6 is the current schema-note YAML format, published as an open specification so other tools can read and write the same ontologies without this project's code.
+TGS 0.7 is the current schema-note YAML format, published as an open specification so other tools can read and write the same ontologies without this project's code.
 
-Sources live in `spec/tgs/`: `SPEC.md`, a JSON Schema `tgs.schema.json` for the frontmatter keys, `namespace.json` (the `tgs:` annotation terms) and `examples/` conformance cases, each a `vault/` with an `expected.json` of declarations and diagnostics. `site/build-spec.mjs` renders them to `site/spec/tgs/v0.6/` and `site/ns/tgs/`, which GitHub Pages serves at `https://typedgraph.org/spec/tgs/v0.6/`, with `spec/tgs/` redirecting to the latest version. TGS 0.1 to 0.5 are archived unchanged in `spec/tgs/archive/` and still rendered to `site/spec/tgs/v0.1/` to `v0.5/`, each with a notice that its published addresses under `volland.github.io/obsigraph` moved to typedgraph.org; TGS 0.3 defines a note as a Markdown or AsciiDoc file ([[asciidoc]]) and adds no schema key; TGS 0.4 adds `description`, `elements` and `sections` and a Document validator conformance level ([[elements]]), with example `07-document-elements`; TGS 0.5 fixes how elements are declared, nested, counted and shown, with example `08-element-scope`; TGS 0.6 moves the version addresses, the JSON Schema `$id` and the `tgs:` namespace to typedgraph.org and adds no key; a note without a `tgs` version key is read as 0.1. Published versions never change; minor versions only add optional keys, and a reader reports keys it does not know. Tests run every example through the reader and the JSON Schema, see [[tests/tgs-spec]].
+Sources live in `spec/tgs/`: `SPEC.md`, a JSON Schema `tgs.schema.json` for the frontmatter keys, `namespace.json` (the `tgs:` annotation terms) and `examples/` conformance cases, each a `vault/` with an `expected.json` of declarations and diagnostics. `site/build-spec.mjs` renders them to `site/spec/tgs/v0.7/` and `site/ns/tgs/`, which GitHub Pages serves at `https://typedgraph.org/spec/tgs/v0.7/`, with `spec/tgs/` redirecting to the latest version. TGS 0.1 to 0.6 are archived unchanged in `spec/tgs/archive/` and still rendered to `site/spec/tgs/v0.1/` to `v0.6/`; 0.1 to 0.5 are shown with a notice that their published addresses under `volland.github.io/obsigraph` moved to typedgraph.org; TGS 0.3 defines a note as a Markdown or AsciiDoc file ([[asciidoc]]) and adds no schema key; TGS 0.4 adds `description`, `elements` and `sections` and a Document validator conformance level ([[elements]]), with example `07-document-elements`; TGS 0.5 fixes how elements are declared, nested, counted and shown, with example `08-element-scope`; TGS 0.6 moves the version addresses, the JSON Schema `$id` and the `tgs:` namespace to typedgraph.org and adds no key; TGS 0.7 adds the OWL mapping (section 14), an OWL exporter conformance level and the term `tgs:edgeType`, adds no key, and has example `09-owl`; a note without a `tgs` version key is read as 0.1. Published versions never change; minor versions only add optional keys, and a reader reports keys it does not know. Tests run every example through the reader and the JSON Schema, see [[tests/tgs-spec]].
 
 ## Export
 
@@ -28,6 +28,70 @@ A node shape with a target class is a type; a property shape with a datatype or 
 
 ## Commands
 
-`tg schema export <out.ttl>` and `tg schema import <file.ttl>` in `packages/cli/src/commands/schema.mts` and the plugin commands "Export schemas as SHACL" and "Import SHACL shapes" run the above.
+`tg schema export <out.ttl>` and `tg schema import <file.ttl>` in `packages/cli/src/commands/schema.mts` and the plugin commands "Export schemas as SHACL", "Export schemas as OWL" and "Import SHACL shapes" run the above.
 
-The CLI takes `--vault`, `--schema-folder` and `--base`; import adds `--layout auto|per-type|single`, `--into` and `--force`, prints the drop report and exits 1 only when a note was left unchanged. The plugin reads the base IRI from the Schema base IRI setting and shows the report in a dialog. The SHACL module is a separate entry point (`@obsigraph/core/src/shacl.ts`) so hosts that never use it do not load the Turtle parser, `n3`.
+The CLI takes `--vault`, `--schema-folder` and `--base`; export takes `--format shacl|owl` (default `shacl`) and, for OWL, `--ontology-iri`, and prints the OWL loss report (`losses` with `--json`); import adds `--layout auto|per-type|single`, `--into` and `--force`, prints the drop report and exits 1 only when a note was left unchanged. The plugin reads the base IRI from the Schema base IRI setting and shows the report in a dialog. The SHACL module is a separate entry point (`@obsigraph/core/src/shacl.ts`) so hosts that never use it do not load the Turtle parser, `n3`.
+
+## OWL export
+
+`exportOwl` writes a schema set as one OWL 2 DL ontology in Turtle with a loss report, implemented by [[packages/core/src/owl/export.ts#exportOwl]] and specified in TGS section 14.
+
+It is the other half of RDF exchange. SHACL says what a valid note looks like and round-trips. OWL says what the types and relations mean, for reasoners and ontology editors, and is export only. Both use the identifiers of TGS section 7, so the two exports of one vault name the same terms. Types become `owl:Class`es and frontmatter properties become one global datatype or object property each, with a union domain. Edge types become object properties with domain and range, and edge properties become annotation properties tied to their edge with `tgs:edgeType`. The annotations of the SHACL export (`tgs:note`, `tgs:template`, `tgs:visualization`, ...) are declared `owl:AnnotationProperty` and kept. `exportOwl` returns `{turtle, losses}`: every construct OWL cannot express is a loss with a stable code (`owl-closed-edges`, `owl-default`, `owl-edge-description`, `owl-edge-property-constraint`, `owl-foreign-term`, `owl-link-values`, `owl-property-conflict`, `owl-range-conflict`), which the CLI prints and the plugin shows in a dialog. The SHACL and OWL exporters share the Turtle writer in `packages/core/src/rdf/turtle.ts`. The OWL module is its own entry point, `@obsigraph/core/src/owl.ts`. Tests are in [[tests/owl-export]].
+
+### Restrictions, not global axioms
+
+`required`, single values, `values` and the targets of a type's edges become `rdfs:subClassOf` restrictions on the declaring class, not `owl:FunctionalProperty` or a global `rdfs:range`.
+
+A TGS constraint belongs to one type, and a property that is single-valued on `Person` may be a list on `Project`, so a global axiom would claim more than the schema does. A required edge with targets becomes `owl:someValuesFrom`, with any target `owl:minCardinality 1`.
+
+- motivated_by:: [[owl-constraints#Open-world semantics]] {weight: primary}
+
+### Edge properties as annotation properties
+
+Edge properties are declared `owl:AnnotationProperty`, with `rdfs:range` their datatype and `tgs:edgeType` naming each edge type that declares them.
+
+OWL has no properties on a property assertion. The reification shape the SHACL export uses would need `rdf:Statement`, `rdf:subject` and `rdf:object`, which are reserved in OWL 2 DL. Annotation properties are how OWL 2 annotates an assertion through `owl:Axiom`. `required` and `values` on an edge property are reported as losses.
+
+- motivated_by:: [[owl-constraints#OWL 2 DL]] {weight: primary}
+
+<option id="owl-reification" outcome="rejected">
+
+Datatype properties with domain `rdf:Statement`, as in the SHACL edge shapes. This leaves OWL 2 DL.
+
+</option>
+
+<option id="owl-reifiers" outcome="rejected">
+
+RDF 1.2 reifiers. They have no OWL semantics yet.
+
+</option>
+
+### Allow-list as an annotation
+
+A type that declares `edges` keeps `tgs:edgesClosed true` on its class, as in SHACL, and the export reports `owl-closed-edges`.
+
+Writing `owl:maxCardinality 0` for every other edge type would make the whole ontology inconsistent on one stray edge, and edges that no schema declares would still be allowed.
+
+- motivated_by:: [[owl-constraints#Open-world semantics]] {weight: primary}
+
+### One role per term
+
+When an IRI is used in two roles, such as `since` as a frontmatter property and as an edge property, the export keeps one role in the order class, object property, datatype property, annotation property.
+
+It writes no axioms for the dropped role and reports `owl-property-conflict`. Punning an object property and a datatype property is not allowed in OWL 2 DL.
+
+- motivated_by:: [[owl-constraints#OWL 2 DL]] {weight: primary}
+
+### No disjointness
+
+Classes are never declared disjoint, because a note can carry several types and disjoint classes would make such a note inconsistent.
+
+- motivated_by:: [[owl-constraints#Open-world semantics]]
+
+### Foreign terms described, not defined
+
+A type or property whose `uri` is outside the base IRI, such as `schema:Person`, is exported with its axioms but without `rdfs:isDefinedBy`, and reported as `owl-foreign-term`.
+
+The vault means that term, so its axioms belong in the ontology, but the ontology does not define another vocabulary's term, and users should notice that they make statements about one.
+
+- motivated_by:: [[shacl#OWL export#Restrictions, not global axioms]]

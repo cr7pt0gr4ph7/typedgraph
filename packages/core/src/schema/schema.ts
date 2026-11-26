@@ -121,7 +121,8 @@ export const DEFAULT_SCHEMA_FOLDER = 'Types/';
 // @tg: implements:: [[openspec:tgs-spec#Versioning]]
 // @tg: implements:: [[openspec:tgs-spec#AsciiDoc notes in TGS 0.3]] {confidence: partial}
 // @tg: implements:: [[openspec:tgs-spec#TGS 0.6 published]]
-export const TGS_VERSION = '0.6';
+// @tg: implements:: [[openspec:tgs-spec#TGS 0.7 published]]
+export const TGS_VERSION = '0.7';
 // @tg: implements:: [[openspec:tgs-spec#Namespace IRI]]
 export const TGS_NAMESPACE = 'https://typedgraph.org/ns/tgs#';
 /** Namespaces the `tgs:` terms had before TGS 0.6; SHACL import reads them as {@link TGS_NAMESPACE}. */

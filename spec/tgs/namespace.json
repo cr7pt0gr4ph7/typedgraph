@@ -12,6 +12,7 @@
     { "term": "kind", "on": "property shape", "range": "string", "comment": "\"list\" for a property of kind list, which SHACL cannot distinguish from a text property with many values." },
     { "term": "default", "on": "property shape", "range": "JSON string", "comment": "A non-scalar default value, such as a list, serialized as JSON. Scalar defaults use sh:defaultValue." },
     { "term": "elements", "on": "node shape", "range": "JSON string", "comment": "The type's elements declarations (TGS 0.4) as a JSON literal." },
-    { "term": "sections", "on": "node shape", "range": "JSON string", "comment": "The type's sections declarations (TGS 0.4) as a JSON literal." }
+    { "term": "sections", "on": "node shape", "range": "JSON string", "comment": "The type's sections declarations (TGS 0.4) as a JSON literal." },
+    { "term": "edgeType", "on": "annotation property (OWL)", "range": "IRI", "comment": "The edge type an edge property belongs to (TGS 0.7). OWL has no properties on a property assertion, so the OWL export declares edge properties as annotation properties and links each to its edge types with this term." }
   ]
 }

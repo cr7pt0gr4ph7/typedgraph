@@ -19,6 +19,7 @@ import {
   type NoteInput,
   type SchemaSet,
 } from '../src/index.js';
+import { exportOwl } from '../src/owl.js';
 import { exportShacl, importShacl } from '../src/shacl.js';
 
 const SPEC = join(__dirname, '../../../spec/tgs');
@@ -84,6 +85,7 @@ const cases = readdirSync(join(SPEC, 'examples')).sort();
 describe('TGS conformance examples', () => {
   // @tg: verifies:: [[tests/tgs-spec#Conformance examples pass]] {since: "2026-10-06", level: unit}
   // @lat: [[tests/tgs-spec#Conformance examples pass]]
+  // @tg: verifies:: [[openspec:tgs-spec#Conformance levels#Conformance examples shipped]] {level: unit}
   it.each(cases)('%s', (name) => {
     const dir = join(SPEC, 'examples', name);
     const notes = loadVault(join(dir, 'vault'));
@@ -94,14 +96,18 @@ describe('TGS conformance examples', () => {
     const shapesPath = join(dir, 'shapes.ttl');
     const bodies = new Map(notes.map((n) => [n.path, splitFrontmatter(n.text).body]));
     const ttl = exportShacl(set, { body: (p) => bodies.get(p) ?? null });
+    const ontologyPath = join(dir, 'ontology.ttl');
+    const owl = exportOwl(set, { body: (p) => bodies.get(p) ?? null }).turtle;
     if (WRITE) {
       const old = existsSync(expectedPath) ? (JSON.parse(readFileSync(expectedPath, 'utf8')) as { invalidAgainstJsonSchema?: string[] }) : {};
       writeFileSync(expectedPath, `${JSON.stringify({ invalidAgainstJsonSchema: old.invalidAgainstJsonSchema ?? [], ...actual }, null, 2)}\n`);
       if (name.includes('shacl')) writeFileSync(shapesPath, ttl);
+      if (name.includes('shacl') || name.includes('owl')) writeFileSync(ontologyPath, owl);
     }
     const expected = JSON.parse(readFileSync(expectedPath, 'utf8')) as typeof actual & { invalidAgainstJsonSchema: string[] };
     expect(actual).toEqual({ types: expected.types, edgeTypes: expected.edgeTypes, diagnostics: expected.diagnostics });
     if (existsSync(shapesPath)) expect(ttl).toBe(readFileSync(shapesPath, 'utf8'));
+    if (existsSync(ontologyPath)) expect(owl).toBe(readFileSync(ontologyPath, 'utf8'));
     for (const n of notes.filter((x) => x.path.startsWith('Types/'))) {
       expect(validateJson(n.frontmatter ?? {}), `${name}/${n.path} against the JSON Schema`).toBe(!expected.invalidAgainstJsonSchema.includes(n.path));
     }
@@ -141,8 +147,8 @@ describe('TGS JSON Schema', () => {
   it('documents every tgs: term the SHACL export uses', () => {
     const ns = JSON.parse(readFileSync(join(SPEC, 'namespace.json'), 'utf8')) as { namespace: string; terms: { term: string }[] };
     const used = new Set<string>();
-    const src = ['export.ts', 'import.ts'].map((f) => readFileSync(join(__dirname, '../src/shacl', f), 'utf8')).join('\n');
-    for (const m of src.matchAll(/\$\{TGS\}(\w+)/g)) used.add(m[1]!);
+    const src = ['shacl/export.ts', 'shacl/import.ts', 'owl/export.ts'].map((f) => readFileSync(join(__dirname, '../src', f), 'utf8')).join('\n');
+    for (const m of src.matchAll(/\$\{TGS\}(\w+)|\btgs\('(\w+)'\)/g)) used.add((m[1] ?? m[2])!);
     expect([...used].sort()).toEqual(ns.terms.map((t) => t.term).sort());
     expect(ns.namespace).toBe('https://typedgraph.org/ns/tgs#');
   });
@@ -191,16 +197,28 @@ describe('TGS AsciiDoc notes', () => {
 
   // @tg: verifies:: [[openspec:tgs-spec#TGS 0.6 published#Published 0.6 at typedgraph.org]] {level: unit}
   // @lat: [[tests/tgs-spec#Version 0.6 published at typedgraph.org]]
-  it('publishes 0.6 with every identifier under typedgraph.org', () => {
-    const spec = readFileSync(join(SPEC, 'SPEC.md'), 'utf8');
+  it('keeps 0.6, with every identifier under typedgraph.org, archived', () => {
+    const spec = readFileSync(join(SPEC, 'archive/v0.6/SPEC.md'), 'utf8');
     expect(spec).toContain('# Typed Graph Schema (TGS) 0.6');
     expect(spec).toContain('| **This version** | `https://typedgraph.org/spec/tgs/v0.6/` |');
     expect(spec).toContain('| **Namespace** | `https://typedgraph.org/ns/tgs#` (prefix `tgs:`) |');
-    expect(JSON.parse(readFileSync(join(SPEC, 'tgs.schema.json'), 'utf8')).$id).toBe('https://typedgraph.org/spec/tgs/v0.6/tgs.schema.json');
+    expect(JSON.parse(readFileSync(join(SPEC, 'archive/v0.6/tgs.schema.json'), 'utf8')).$id).toBe('https://typedgraph.org/spec/tgs/v0.6/tgs.schema.json');
     expect(TGS_NAMESPACE).toBe('https://typedgraph.org/ns/tgs#');
-    expect(readFileSync(join(__dirname, '../../../site/build-spec.mjs'), 'utf8')).toContain("const VERSION = '0.6'");
     // 0.5 stays as published, with its former addresses.
     expect(readFileSync(join(SPEC, 'archive/v0.5/SPEC.md'), 'utf8')).toContain('`https://volland.github.io/obsigraph/spec/tgs/v0.5/`');
+  });
+
+  // @tg: verifies:: [[openspec:tgs-spec#TGS 0.7 published#Published 0.7 with the OWL mapping]] {level: unit}
+  // @lat: [[tests/tgs-spec#Version 0.7 published with the OWL mapping]]
+  it('publishes 0.7 with the OWL mapping and an OWL exporter level, 0.6 archived unchanged', () => {
+    const spec = readFileSync(join(SPEC, 'SPEC.md'), 'utf8');
+    expect(spec).toContain('# Typed Graph Schema (TGS) 0.7');
+    expect(spec).toContain('| **This version** | `https://typedgraph.org/spec/tgs/v0.7/` |');
+    expect(spec).toContain('## 14. OWL mapping');
+    expect(spec).toContain('| **OWL exporter** |');
+    expect(JSON.parse(readFileSync(join(SPEC, 'tgs.schema.json'), 'utf8')).$id).toBe('https://typedgraph.org/spec/tgs/v0.7/tgs.schema.json');
+    expect(readFileSync(join(__dirname, '../../../site/build-spec.mjs'), 'utf8')).toContain("const VERSION = '0.7'");
+    expect(readFileSync(join(SPEC, 'archive/v0.6/SPEC.md'), 'utf8')).not.toContain('OWL mapping');
   });
 
   // @tg: verifies:: [[openspec:tgs-spec#Namespace IRI#Former namespace imported]] {level: unit}

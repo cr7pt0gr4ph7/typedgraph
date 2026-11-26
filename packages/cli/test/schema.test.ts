@@ -58,3 +58,33 @@ it('exports schema notes as SHACL and imports them into another vault with a rep
   expect((await tg(target, 'schema', 'import', 'missing.ttl')).code).toBe(2);
   expect((await tg(target, 'schema', 'convert', 'x')).code).toBe(2);
 });
+
+// @tg: verifies:: [[tests/owl-export#Export from the CLI as OWL]] {level: unit}
+// @lat: [[tests/owl-export#Export from the CLI as OWL]]
+// @tg: verifies:: [[openspec:owl-export#Export schemas as OWL#Export from the CLI as OWL]]
+// @tg: verifies:: [[openspec:owl-export#Loss report#Losses in the CLI]]
+it('exports schema notes as OWL with a loss report', async () => {
+  const v = folder({
+    'Types/Person.md': '---\nschema:\n  properties: {email: {required: true}, status: {default: new}}\n  edges: {worksAt: Company}\n---\n',
+    'Types/Company.md': '---\nschema: {}\n---\n',
+  });
+  const r = await tg(v, 'schema', 'export', 'out/ontology.ttl', '--format', 'owl', '--ontology-iri', 'https://example.org/people');
+  expect(r.code).toBe(0);
+  expect(r.out).toBe(
+    [
+      'Exported 2 types and 0 edge types from Types/ to out/ontology.ttl as OWL.',
+      '',
+      'Loss report (2 things OWL does not express):',
+      '  owl-closed-edges Person: Person allows only the edges it declares; OWL keeps this only as the annotation tgs:edgesClosed',
+      '  owl-default Person.status: the default of status on Person has no OWL counterpart',
+      '',
+    ].join('\n'),
+  );
+  const ttl = readFileSync(join(v, 'out/ontology.ttl'), 'utf8');
+  expect(ttl).toContain('<https://example.org/people>\n    a owl:Ontology ;\n    rdfs:label "Types" ;');
+  expect(ttl).toContain(':Person\n    a owl:Class ;');
+  const j = await tg(v, 'schema', 'export', 'o.ttl', '--format', 'owl', '--json');
+  expect(JSON.parse(j.out).losses.map((l: { code: string }) => l.code)).toEqual(['owl-closed-edges', 'owl-default']);
+  expect((await tg(v, 'schema', 'export', 'x.ttl', '--format', 'owl2')).code).toBe(2);
+  expect((await tg(v, 'schema', 'export', 'x.ttl', '--ontology-iri', 'urn:x')).code).toBe(2);
+});
