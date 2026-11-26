@@ -46,3 +46,11 @@ With the ontology, a Cypher pattern with the declared name or the inverse name m
 ## Inverse edges survive SHACL
 
 The SHACL export writes `inverseEdge` as `tgs:inverseEdge` on the edge shape, and import and a second export give it back unchanged.
+
+## Backlinks named from the note's side
+
+The VS Code backlinks view groups an incoming edge under the name it has at the open note: an incoming `worksAt` is listed as `hasEmployee`.
+
+## Type details show inverse names
+
+A type's details list an inverse name as an outgoing edge of the declared target type and as an incoming edge of the declared source type.

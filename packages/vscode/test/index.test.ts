@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, wr
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
+import { schemasFromGraph } from '@obsigraph/core';
 import { backlinksFor, panelRows } from '../src/backlinks';
 import { GraphSession } from '../src/graph-session';
 import { WorkspaceIndex } from '../src/workspace-index';
@@ -225,4 +226,20 @@ it('indexes AsciiDoc notes with backlinks and live updates, unless turned off', 
   await off.update('book/ch03.adoc');
   expect(off.isNote('book/ch03.adoc')).toBe(false);
   expect(off.graph.node('book/ch03.adoc')).toBeUndefined();
+});
+
+// @tg: verifies:: [[tests/inverse-edges#Backlinks named from the note's side]] {level: unit}
+// @tg: verifies:: [[openspec:vscode-extension#Backlinks named from the note's side#Incoming edge under its inverse name]]
+it('lists an incoming edge under the name it has at the open note', async () => {
+  const { idx } = await index(['.'], {
+    'Types/Edges.md': '---\nedgeTypes:\n  worksAt: {inverseEdge: hasEmployee}\n  friendsWith: {inverseEdge: friendsWith}\n---\n',
+    'notes/Ada.md': 'worksAt:: [[Acme]]\nfriendsWith:: [[Bob]]\n',
+    'notes/Acme.md': '',
+    'notes/Bob.md': 'knows:: [[Ada]]\n',
+  });
+  const schemas = schemasFromGraph(idx.graph, 'Types/');
+  expect(backlinksFor(idx, 'notes/Acme.md', schemas).groups.map((g) => [g.title, g.items.map((i) => i.label)])).toEqual([['hasEmployee', ['Ada']]]);
+  expect(backlinksFor(idx, 'notes/Bob.md', schemas).groups.map((g) => g.title)).toEqual(['friendsWith']);
+  expect(backlinksFor(idx, 'notes/Ada.md', schemas).groups.map((g) => g.title)).toEqual(['knows']);
+  expect(backlinksFor(idx, 'notes/Acme.md').groups.map((g) => g.title)).toEqual(['worksAt']);
 });

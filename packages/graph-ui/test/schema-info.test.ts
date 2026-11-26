@@ -47,4 +47,15 @@ describe('schema info', () => {
     // Without rules of its own a type may use every edge type that has no source restriction.
     expect(schemaInfo(type('Free', {}), [], declared).outgoing.map((e) => e.type)).toEqual(['related']);
   });
+
+  // @tg: verifies:: [[tests/inverse-edges#Type details show inverse names]] {level: unit}
+  it('lists an inverse name as an edge of the target type', () => {
+    const person = type('Person', {});
+    const company = type('Company', {});
+    const worksAt = { type: 'worksAt', path: '', from: ['Person'], to: ['Company'], properties: [], uri: null, style: null, inverseEdge: 'hasEmployee' };
+    const info = schemaInfo(company, [person, company], [worksAt]);
+    expect(info.outgoing).toEqual([{ type: 'hasEmployee', targets: ['Person'], cardinality: null }]);
+    expect(info.incoming).toEqual([{ type: 'worksAt', from: ['Person'] }]);
+    expect(schemaInfo(person, [person, company], [worksAt]).incoming).toEqual([{ type: 'hasEmployee', from: ['Company'] }]);
+  });
 });
