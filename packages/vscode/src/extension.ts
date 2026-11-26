@@ -6,6 +6,7 @@ import { buildHtml, exportFileName } from './export';
 import { GraphSession, type GraphScope, type SessionView } from './graph-session';
 import { buildGraphPdf, type Scene } from './pdf';
 import { BAD_TITLE, luhmannParentOf, planWorkspaceNote, typesIn } from './new-note';
+import { overrideOf, workspaceSchemaFolder } from './schema-folder';
 import { needsSetup, runSetup } from './setup';
 import { WorkspaceIndex } from './workspace-index';
 
@@ -38,7 +39,13 @@ export function activate(context: vscode.ExtensionContext): void {
     const c = vscode.workspace.getConfiguration('typegraph');
     return { roots: c.get<string[]>('roots', ['.']), ignore: c.get<string[]>('ignore', ['node_modules']), asciidoc: c.get<boolean>('asciidoc', true) };
   };
-  const schemaFolder = () => vscode.workspace.getConfiguration('typegraph').get<string>('schemaFolder', 'Types/');
+  // A schemaFolder the user set wins; otherwise .tg/config.json is read on every use, so an edit to it applies at once.
+  const schemaChoice = () => workspaceSchemaFolder(folder!.uri.fsPath, overrideOf(vscode.workspace.getConfiguration('typegraph').inspect<string>('schemaFolder')));
+  const schemaFolder = () => {
+    const choice = schemaChoice();
+    if (choice.problem) void vscode.window.showWarningMessage(`TypeGraph: ${choice.problem}; using ${choice.folder}.`);
+    return choice.folder;
+  };
 
   const activePath = (): string | null => {
     const doc = vscode.window.activeTextEditor?.document;
@@ -250,8 +257,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const newNote = async (uri?: vscode.Uri) => {
     if (!folder) return;
     await ensureLoaded();
+    const choice = schemaChoice();
     const types = typesIn(index!, schemaFolder());
-    if (types.length === 0) return void vscode.window.showInformationMessage(`No schema notes found in ${schemaFolder()}. Set typegraph.schemaFolder or add types.`);
+    const from = choice.source === 'setting' ? 'from typegraph.schemaFolder' : choice.source === 'config' ? 'from .tg/config.json' : 'the default';
+    if (types.length === 0) return void vscode.window.showInformationMessage(`No schema notes found in ${choice.folder} (${from}). Add types there, set schemaFolder in .tg/config.json, or override it with typegraph.schemaFolder.`);
     const pick = await vscode.window.showQuickPick(
       types.map((t) => ({ label: t.type, description: t.ids.map((r) => `${r.kind}${r.auto ? '' : ' on request'}`).join(', '), detail: t.description ?? t.properties.map((p) => p.name).join(', '), type: t.type })),
       { placeHolder: 'Choose a type', matchOnDetail: true },

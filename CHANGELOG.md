@@ -12,6 +12,7 @@ One schema folder for every command, the CLI's config and the Obsidian plugin.
 - **`schemaFolder` in `.tg/config.json`.** Without the flag, those commands read the folder from the committed config, then fall back to `Types/`. A broken value is reported and keeps the `notes` globs.
 - **Init and upgrade use the folder.** `tg init --schema-folder Ontology` writes `code-types.md`, `core-types.md` and `spec-types.md` to `Ontology/`. The instructions, skills, Cursor rules, ontology guide and spec ontology name the folder, and it is recorded in `.tg/config.json`. `tg upgrade` refreshes the ontology where the config says it lives. Without the flag, nothing changes for existing projects.
 - **Obsidian plugin: "Sync settings with .tg/config.json".** Keeps the plugin's schema folder and the config's `schemaFolder` the same, both ways: a change in the settings is written to the file, and an edit of the file is picked up within a few seconds. It is on for a new configuration when the vault already has `.tg/config.json`.
+- **VS Code extension follows `.tg/config.json`.** The New Typed Note commands read the config's `schemaFolder`, re-read on every use. `typegraph.schemaFolder` now defaults to empty and overrides the config only when you set it.
 
 ## 0.31.0 — 2026-11-24
 
