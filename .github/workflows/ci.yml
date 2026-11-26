@@ -4,7 +4,7 @@ name: CI
 # The reference lat.md version is pinned: bump it deliberately and re-run.
 on:
   push:
-    branches: [main, dev]
+    branches: [main, dev, staging]
   pull_request:
 
 jobs:
