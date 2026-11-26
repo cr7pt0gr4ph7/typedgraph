@@ -2,6 +2,7 @@ import { expect, it } from 'vitest';
 import { editorDiagnostics } from '../src/edge-diagnostics';
 
 // @tg: verifies:: [[tests/edge-parsing#Editor underlines edge problems]] {since: "2026-11-26", level: unit}
+// @lat: [[tests/edge-parsing#Editor underlines edge problems]]
 // @tg: verifies:: [[openspec:edge-parsing#Malformed property blocks#Underlined in the editor]]
 it('turns edge-syntax diagnostics into document ranges for underlines', () => {
   const text = '# A\r\n\r\nknows:: [[Bob]] {since: 2020\r\nknows:: [[Eve]] {since: "a" b}\r\n';
