@@ -230,6 +230,12 @@ In the plugin, [[packages/plugin/src/vault-index.ts#VaultIndex]] feeds every not
 
 `tg import <path> [--mount] [--into name]` copies a `lat.md/` folder (or the one inside a project directory) into the current vault or project, or symlinks it with `--mount`. It refuses a non-empty destination and never modifies the source.
 
+## Inverse edges
+
+`tg inverses` keeps both ends of inverse and symmetric edges written in a vault ([[graph-model#Inverse edges]]). It is a dry run unless `--write` is given.
+
+`tg inverses [--vault dir] [--schema-folder Types] [--write] [--placement heading|end|frontmatter] [--heading Relations] [--winner declared|last-edited] [--deletions keep|mirror] [--json]` (`packages/cli/src/commands/inverses.mts`) reads the vault like `tg validate` and plans with [[packages/core/src/schema/maintain.ts#planInverseSync]]. It lists each `add`, `update`, `remove` and `skip` with the edge that causes it. With `--write` it applies the edits. `last-edited` compares the notes' file modification times. Frontmatter placement also reads frontmatter links as edges, so links it wrote count on the next run. A dry run that finds work exits 1, so the command can gate CI; otherwise it exits 0, and 2 for a bad flag or vault.
+
 ## Vault validation
 
 `tg validate` checks a whole vault against its schema notes outside Obsidian, with the findings the plugin's diagnostics list shows, stable codes and text, JSON or SARIF output for CI.

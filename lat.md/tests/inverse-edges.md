@@ -59,6 +59,10 @@ The losing end's property block is rewritten with the winner's properties, the w
 
 With `deletions: mirror` a lone end found left over (written with the inverse name, or older than its other note) is removed; with `keep` it is completed.
 
+## tg inverses writes on request
+
+`tg inverses` lists missing and differing ends as a dry run (exit 1), writes them with `--write`, and takes placement, heading, winner and deletions as flags.
+
 ## Inverse edges survive SHACL
 
 The SHACL export writes `inverseEdge` as `tgs:inverseEdge` on the edge shape, and import and a second export give it back unchanged.
