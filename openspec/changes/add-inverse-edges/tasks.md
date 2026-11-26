@@ -10,6 +10,7 @@
 
 - [x] 2.1 `ExecOptions.schemas`: run on the canonical view; inverse names and symmetric types in relationship patterns
 - [x] 2.2 Pass the ontology to the engine from `tg cypher`, the plugin and the sidecar
+- [x] 2.3 A result notice for a directed pattern on a symmetric edge type
 
 ## 3. SHACL
 

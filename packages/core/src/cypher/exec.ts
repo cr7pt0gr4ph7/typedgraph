@@ -57,6 +57,7 @@ export function execute(graph: GraphView, q: Query, params: Params = {}, opts: E
   const plain = isPlain(sem);
   const view = plain ? graph : graph instanceof Graph ? canonicalView(graph, opts.schemas!) : buildView(graph, sem);
   const ctx = new Ctx(view, params, opts.maxPathDepth ?? DEFAULT_MAX_PATH_DEPTH, opts.timeoutMs ? Date.now() + opts.timeoutMs : Infinity, plain ? null : sem);
+  if (!plain) noteDirectedSymmetric(ctx, q, sem);
   const columns = analyze(q);
   let rows: Env[] = [new Map<string, Value>()];
   let scope: Scope = new Map<string, ColumnKind>();
@@ -336,6 +337,24 @@ function matchPatterns(ctx: Ctx, env: Env, patterns: Pattern[], pi: number, used
         else next();
       }),
     );
+  }
+}
+
+/**
+ * A directed pattern on a symmetric edge type, such as `(a)-[:friendsWith]->(b)`, reads as if the
+ * direction mattered, but it matches the edges written either way. Say so once per type, with the
+ * undirected form to write instead.
+ */
+// @tg: implements:: [[openspec:cypher-query#Directed patterns on symmetric edges]]
+function noteDirectedSymmetric(ctx: Ctx, q: Query, sem: EdgeSemantics): void {
+  for (const clause of q.clauses) {
+    if (clause.k !== 'match') continue;
+    for (const p of clause.patterns)
+      for (const rp of p.rels) {
+        if (rp.dir === 'both') continue;
+        for (const t of rp.types)
+          if (sem.symmetric.has(t)) ctx.notices.add(`'${t}' is symmetric, so the directed pattern matches it in both directions; write -[:${t}]- to match it undirected.`);
+      }
   }
 }
 

@@ -10,3 +10,14 @@ When the engine is given a schema set, it SHALL query the canonical edge view. A
 #### Scenario: Symmetric pattern
 - **WHEN** Ada writes `friendsWith:: [[Bob]]` and the query is `MATCH ({title: 'Bob'})-[:friendsWith]->(x) RETURN x.title`
 - **THEN** the result is `Ada`
+
+### Requirement: Directed patterns on symmetric edges
+When a directed relationship pattern names a symmetric edge type, the result SHALL carry a notice, once per edge type, saying that the pattern matches in both directions and giving the undirected form. Undirected patterns, and patterns without a symmetric type, SHALL add no notice.
+
+#### Scenario: Directed symmetric pattern noticed
+- **WHEN** `friendsWith` is symmetric and the query is `MATCH (a)-[:friendsWith]->(b) RETURN b`
+- **THEN** the result has a notice naming `friendsWith` and `-[:friendsWith]-`
+
+#### Scenario: Undirected symmetric pattern quiet
+- **WHEN** the query is `MATCH (a)-[:friendsWith]-(b) RETURN b`
+- **THEN** the result has no notice

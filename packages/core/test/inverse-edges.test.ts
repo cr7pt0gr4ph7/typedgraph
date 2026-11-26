@@ -193,6 +193,18 @@ describe('cypher over inverse edges', () => {
     expect(run(g, 'MATCH (a)-[:friendsWith]-(b) RETURN count(*)')).toEqual([[2]]);
   });
 
+  // @tg: verifies:: [[tests/inverse-edges#Directed symmetric patterns noticed]] {level: unit}
+  // @tg: verifies:: [[openspec:cypher-query#Directed patterns on symmetric edges#Directed symmetric pattern noticed]]
+  // @tg: verifies:: [[openspec:cypher-query#Directed patterns on symmetric edges#Undirected symmetric pattern quiet]]
+  it('notes that a directed pattern on a symmetric edge type matches both ways', () => {
+    const g = graph();
+    const engine = new BuiltinEngine(g, () => ({ schemas: schemasFromGraph(g, 'Types/') }));
+    const directed = engine.run('MATCH (a)-[:friendsWith]->(b) MATCH (b)<-[:friendsWith]-(c) RETURN count(*)');
+    expect(directed.notices).toEqual(["'friendsWith' is symmetric, so the directed pattern matches it in both directions; write -[:friendsWith]- to match it undirected."]);
+    expect(engine.run('MATCH (a)-[:friendsWith]-(b) RETURN b').notices).toBeUndefined();
+    expect(engine.run('MATCH (a)-[:worksAt]->(b) RETURN b').notices).toBeUndefined();
+  });
+
   it('keeps queries as before without schemas', () => {
     const g = graph();
     expect(new BuiltinEngine(g).run('MATCH ()-[r:hasEmployee]->() RETURN count(r)').rows).toEqual([[1]]);

@@ -43,6 +43,10 @@ Endpoints, edge properties and counts are checked on the declared direction, and
 
 With the ontology, a Cypher pattern with the declared name or the inverse name matches the edge whichever end wrote it, and a symmetric edge matches both ways.
 
+## Directed symmetric patterns noticed
+
+A directed Cypher pattern on a symmetric edge type gets one notice per type, naming the undirected form; undirected patterns get none.
+
 ## Inverse edges survive SHACL
 
 The SHACL export writes `inverseEdge` as `tgs:inverseEdge` on the edge shape, and import and a second export give it back unchanged.

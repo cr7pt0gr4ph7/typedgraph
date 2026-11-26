@@ -31,7 +31,7 @@ Write clauses fail as read-only. Valid openCypher outside this list fails with k
 
 Given the ontology, the built-in engine queries the canonical edge view ([[graph-model#Inverse edges]]), so a relation matches whichever end wrote it.
 
-With `ExecOptions.schemas`, [[packages/core/src/cypher/exec.ts#execute]] runs on [[packages/core/src/schema/inverse.ts#canonicalView]]. A relationship pattern with an inverse name, `(c)-[:hasEmployee]->(p)`, matches the declared `worksAt` edge the other way round, and a directed pattern with a symmetric type matches its edges in both directions. `type(r)`, `startNode(r)` and `endNode(r)` report the declared type and direction. `tg cypher`, the Obsidian plugin and the sidecar pass the ontology; without one, or without inverse declarations, queries run exactly as before. The Ladybug backend still stores edges as written.
+With `ExecOptions.schemas`, [[packages/core/src/cypher/exec.ts#execute]] runs on [[packages/core/src/schema/inverse.ts#canonicalView]]. A relationship pattern with an inverse name, `(c)-[:hasEmployee]->(p)`, matches the declared `worksAt` edge the other way round, and a directed pattern with a symmetric type matches its edges in both directions. `type(r)`, `startNode(r)` and `endNode(r)` report the declared type and direction. Because a directed pattern on a symmetric type looks as if direction mattered, the result then carries a notice suggesting the undirected form `-[:friendsWith]-`. `tg cypher`, the Obsidian plugin and the sidecar pass the ontology; without one, or without inverse declarations, queries run exactly as before. The Ladybug backend still stores edges as written.
 
 ## Query block
 
