@@ -1,7 +1,8 @@
-import { BuiltinEngine, buildLatGraph, CypherError, isSpecTarget, resultToJson, type CodeMode, type QueryResult, type Value } from '@obsigraph/core';
+import { BuiltinEngine, buildLatGraph, CypherError, DEFAULT_SCHEMA_FOLDER, isSpecTarget, resultToJson, type CodeMode, type QueryResult, type Value } from '@obsigraph/core';
 import { parseYaml } from '@obsigraph/node-vault';
 import { EXIT_ERROR, EXIT_FINDINGS, EXIT_OK, register, type Command } from '../cli.mjs';
 import { NoLatDir, Project } from '../project.mjs';
+import { missingOntology } from '../schema-folder.mjs';
 
 // @tg: implements:: [[openspec:code-layer#Code mode setting]]
 function codeMode(flag: string | true | undefined, env: string | undefined): CodeMode {
@@ -20,6 +21,7 @@ function cell(v: Value): string {
   return typeof v === 'string' ? v : JSON.stringify(v);
 }
 
+// @tg: implements:: [[openspec:tg-cli#Schema folder required]]
 export const cypher: Command = {
   name: 'cypher',
   summary: 'Run a read-only openCypher query over the section graph',
@@ -40,6 +42,11 @@ export const cypher: Command = {
         return EXIT_ERROR;
       }
       throw e;
+    }
+    const noOntology = missingOntology(project.root, DEFAULT_SCHEMA_FOLDER);
+    if (noOntology) {
+      ctx.err(`${noOntology}\n`);
+      return EXIT_ERROR;
     }
     let result: QueryResult;
     try {

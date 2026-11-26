@@ -11,7 +11,7 @@ const LAT = '@' + 'lat';
 
 function project(files: Record<string, string>): string {
   const dir = mkdtempSync(join(tmpdir(), 'tg-notes-'));
-  const all = { 'lat.md/lat.md': '# Project\n\nDocs for the book.\n', ...files };
+  const all = { 'lat.md/lat.md': '# Project\n\nDocs for the book.\n', 'Types/code-types.md': '---\nschemas:\n  Decision: {}\n---\n# Code types\n\nThe ontology the graph commands read.\n', ...files };
   for (const [rel, text] of Object.entries(all)) {
     mkdirSync(dirname(join(dir, rel)), { recursive: true });
     writeFileSync(join(dir, rel), text);
