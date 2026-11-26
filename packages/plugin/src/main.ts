@@ -4,6 +4,7 @@ import { latLinkTarget } from './lat-links';
 import { makeStyler, type Styler } from './render/styler';
 import type { EditorView } from '@codemirror/view';
 import { edgeEmbedEditorExtension, edgeEmbedPostProcessor, refreshEmbeds } from './embeds/edge-embeds';
+import { edgeDiagnosticsEditorExtension } from './edge-diagnostics';
 import { QueryBlock } from './query/query-block';
 import { DEFAULT_SETTINGS, ObsigraphSettingTab, type ObsigraphSettings } from './settings';
 import { VaultIndex } from './vault-index';
@@ -111,6 +112,7 @@ export default class ObsigraphPlugin extends Plugin {
 
     this.registerMarkdownPostProcessor(edgeEmbedPostProcessor(this));
     this.registerEditorExtension(edgeEmbedEditorExtension(this, this.editors));
+    this.registerEditorExtension(edgeDiagnosticsEditorExtension());
     this.register(
       this.index.onChange(() => {
         for (const view of this.editors) view.dispatch({ effects: refreshEmbeds.of(null) });

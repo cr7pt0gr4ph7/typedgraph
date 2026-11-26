@@ -39,6 +39,10 @@ One schema folder for every command, the CLI's config and the Obsidian plugin.
 - **Obsidian plugin: "Sync .tg/config.json".** Keeps the plugin's schema folder and the config's `schemaFolder` the same, both ways: a change in the settings is written to the file, and an edit of the file is picked up within a few seconds. It is on for a new configuration when the vault already has `.tg/config.json`.
 - **VS Code extension follows `.tg/config.json`.** The New Typed Note commands read the config's `schemaFolder`, re-read on every use. `typegraph.schemaFolder` now defaults to empty and overrides the config only when you set it.
 
+### Added
+
+- **Squiggles for edge syntax in Obsidian.** The editor underlines malformed edge property blocks with a wavy line in source mode and live preview, with the finding as hover text. It does not wait for the vault index.
+
 ## 0.31.0 — 2026-11-24
 
 OpenFlow joins the spec frameworks `tg` traces.

@@ -12,6 +12,12 @@ An edge is a single line `type:: [[Target]] {props}` where the property block is
 
 Implemented by [[packages/core/src/edges/parse.ts#parseEdges]], with property blocks parsed by [[packages/core/src/edges/props.ts#parseProps]]. Example: `knows:: [[Bob]] {since: 2020, label: "met at conf"}`. List items and comma-separated links are accepted; YAML frontmatter and fenced code are skipped. Source heading is recorded as edge metadata so sub-note nodes can be added later without breaking edges.
 
+## Problems in the editor
+
+In Obsidian, every edge-syntax problem of the open note, such as a malformed property block, is underlined with a wavy line in source mode and live preview, with the finding as hover text.
+
+[[packages/plugin/src/edge-diagnostics.ts#edgeDiagnosticsEditorExtension]] draws the underlines. [[packages/plugin/src/edge-diagnostics.ts#editorDiagnostics]] reparses the editor text with [[packages/core/src/edges/parse.ts#parseEdges]] on each change rather than waiting for the vault index, and marks from where the problem starts to the end of its line.
+
 ## Markdown link targets
 
 A standard markdown link to a note works as an edge target, alone or mixed with wikilinks: `knows:: [Bob](/people/bob.md) {since: 2020}`.
