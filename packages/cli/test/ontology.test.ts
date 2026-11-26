@@ -55,8 +55,14 @@ The ontology.
 `,
 };
 
-function decisions(body: string): Record<string, string> {
+/** Docs with a Decision section holding `body`, without an ontology. */
+function bareDecisions(body: string): Record<string, string> {
   return { ...DOCS, 'lat.md/decisions.md': doc('Decision', 'Decisions', `## Regional storage\n\nWe store data in Frankfurt.\n\n${body}`) };
+}
+
+/** The same docs with the ontology in `Types/`, which `tg cypher` needs. */
+function decisions(body: string): Record<string, string> {
+  return { ...ONTOLOGY, ...bareDecisions(body) };
 }
 
 // @tg: verifies:: [[tests/tg-ontology#Typed edges in docs#Decision motivated by a constraint]] {since: "2026-10-14", level: unit}
@@ -160,7 +166,17 @@ it('passes when every typed edge fits, ignoring references and @lat links', asyn
   const r = await tg(dir, ['ontology', 'check']);
   expect(r.out).toContain('All typed edges agree with the ontology');
   expect(r.code).toBe(0);
-  expect((await tg(project(decisions('- madeUp:: [[constraints#GDPR]]\n')), ['ontology', 'check'])).out).toContain('No ontology declared');
+  expect((await tg(project(bareDecisions('- madeUp:: [[constraints#GDPR]]\n')), ['ontology', 'check'])).out).toContain('No ontology declared');
+});
+
+// @tg: verifies:: [[tests/tg-ontology#Missing ontology#Cypher without an ontology]] {since: "2026-11-26", level: unit}
+// @lat: [[tests/tg-ontology#Missing ontology#Cypher without an ontology]]
+// @tg: verifies:: [[openspec:tg-cli#Schema folder required#Missing schema folder]]
+// @tg: verifies:: [[openspec:tg-cli#Schema folder required#Schema folder without schema notes]]
+it('refuses to run cypher when the schema folder gives no schema notes', async () => {
+  const message = 'No ontology declared: Types/ has no schema notes. Run tg init to install the code ontology, or add schema notes to Types/.\n';
+  expect(await tg(project(DOCS), ['cypher', '--json', 'MATCH (s:Section) RETURN count(s)'])).toEqual({ code: 2, out: message });
+  expect(await tg(project({ ...DOCS, 'Types/README.txt': 'later\n' }), ['cypher', 'MATCH (s) RETURN count(s)'])).toEqual({ code: 2, out: message });
 });
 
 // @tg: verifies:: [[tests/tg-ontology#Ontology-aware guidance#Instructions teach the ontology]] {since: "2026-10-14", level: unit}

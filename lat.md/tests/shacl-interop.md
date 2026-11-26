@@ -62,3 +62,5 @@ Export, import into an empty vault and export again gives byte-identical Turtle,
 ## Schema commands
 
 `tg schema export` and `tg schema import` write and read files, report counts and the drop report, and use exit codes 0 and 2 for success and bad input.
+
+With no schema notes export writes nothing and exits 2; with `--ignore missing-ontology` it writes prefixes only.

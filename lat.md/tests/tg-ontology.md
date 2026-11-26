@@ -51,6 +51,14 @@ A `supersedes::` edge from a `Concept` section is reported as a wrong source, a 
 
 Declared edges with allowed endpoints and properties pass with exit 0, plain wiki links and `@lat:` comments are ignored, and a project with no ontology has nothing to check.
 
+## Missing ontology
+
+Commands that need the ontology to build the graph refuse to run without one.
+
+### Cypher without an ontology
+
+With no schema notes, because `Types/` is missing or holds no `*.md` note, `tg cypher` prints the "No ontology declared" message of `tg ontology` to stderr, prints nothing to stdout and exits 2.
+
 ## Ontology-aware guidance
 
 The instructions, skills and OpenSpec guidance teach the ontology.

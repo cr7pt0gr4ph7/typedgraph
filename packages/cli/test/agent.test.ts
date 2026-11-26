@@ -171,6 +171,8 @@ it('writes Cursor rules and skills and no Cursor hook configuration', async () =
 // @tg: verifies:: [[openspec:tg-agent-integration#MCP server#Cypher over docs and code]]
 it('serves the tools over MCP and tg_cypher returns the tagged result contract', async () => {
   const dir = project();
+  mkdirSync(join(dir, 'Types'));
+  writeFileSync(join(dir, 'Types', 'code-types.md'), '---\nschemas:\n  Decision: {}\n---\n# Code types\n\nThe ontology the graph commands read.\n');
   const server = createTgMcpServer(dir, { cwd: dir, out: () => undefined, err: () => undefined, env: {} });
   const [a, b] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 't', version: '0' });

@@ -58,7 +58,7 @@ The system SHALL ask for a second factor.
 
 function project(files: Record<string, string>): string {
   const root = mkdtempSync(join(tmpdir(), 'tg-trace-'));
-  const all: Record<string, string> = { 'lat.md/lat.md': '# Lat\n\nIndex.\n\n- [[auth]] — auth\n', 'lat.md/auth.md': '# Auth\n\nHow login works.\n', ...files };
+  const all: Record<string, string> = { 'lat.md/lat.md': '# Lat\n\nIndex.\n\n- [[auth]] — auth\n', 'lat.md/auth.md': '# Auth\n\nHow login works.\n', 'Types/code-types.md': '---\nschemas:\n  Decision: {}\n---\n# Code types\n\nThe ontology the graph commands read.\n', ...files };
   for (const [p, t] of Object.entries(all)) {
     mkdirSync(dirname(join(root, p)), { recursive: true });
     writeFileSync(join(root, p), t);
