@@ -1,6 +1,6 @@
 import { App, PluginSettingTab, Setting, type SettingDefinitionItem } from 'obsidian';
 import type ObsigraphPlugin from './main';
-import { DEFAULT_BASE_IRI, DEFAULT_INVERSE_HEADING, DEFAULT_MAX_PATH_DEPTH, DEFAULT_SCHEMA_FOLDER, type CodeMode, type DeletionPolicy, type EdgeStyle, type InversePlacement, type MismatchWinner, type NodeStyle } from '@obsigraph/core';
+import { DEFAULT_BASE_IRI, DEFAULT_INVERSE_HEADING, DEFAULT_MAX_PATH_DEPTH, DEFAULT_SCHEMA_FOLDER, type CodeMode, type DeletionPolicy, type EdgeStyle, type InversePlacement, type NodeStyle, type SourceOfTruth } from '@obsigraph/core';
 import { parseEdgeStyles, parseTypeStyles } from './render/styles';
 
 export interface ObsigraphSettings {
@@ -47,10 +47,12 @@ export interface ObsigraphSettings {
   inversePlacement: InversePlacement;
   /** Heading for the `heading` placement. */
   inverseHeading: string;
-  /** Source of truth for mismatches and, with mirrored deletions, for lone ends. */
-  inverseWinner: MismatchWinner;
+  /** Whose properties are kept when the two ends of an edge differ. */
+  inversePropertyWinner: SourceOfTruth;
   /** Whether a lone end left over from a deleted edge is removed. */
   inverseDeletions: DeletionPolicy;
+  /** With mirrored deletions, which end decides whether a lone end is new or left over. */
+  inverseDeletionWinner: SourceOfTruth;
 }
 
 /** Settings that choose which notes are indexed; a change re-indexes the vault. */
@@ -79,16 +81,18 @@ export const DEFAULT_SETTINGS: ObsigraphSettings = {
   inverseOnSave: false,
   inversePlacement: 'heading',
   inverseHeading: DEFAULT_INVERSE_HEADING,
-  inverseWinner: 'declared',
+  inversePropertyWinner: 'declared',
   inverseDeletions: 'keep',
+  inverseDeletionWinner: 'declared',
 };
 
 const INVERSE_DESCS = {
   onSave: 'When a note is saved, write the missing end of its inverse and symmetric edges (as declared with inverseEdge) into the notes they point at. The "Write missing inverse edges" command does the same for the whole vault.',
   placement: 'Where a missing end goes in the other note: under the heading below (created at the end when missing), at the end of the note, or as a frontmatter link. Frontmatter links carry no properties and need "Frontmatter links as edges".',
   heading: 'Heading the missing ends are written under.',
-  winner: 'Which end is the source of truth. Declared: the end written with the declared name (worksAt, not hasEmployee). Last edited: the end in the more recently modified note. It decides whose properties are kept when the ends differ, and, with mirrored deletions, whether a lone end is new or left over.',
-  deletions: 'Keep: a lone end always gets its other end written. Mirror: a lone end the source of truth finds left over from a deleted edge is removed instead.',
+  propertyWinner: 'When the two ends of an edge have different properties, whose are kept. Declared: the end written with the declared name (worksAt, not hasEmployee). Last edited: the end in the more recently modified note.',
+  deletions: 'Keep: a lone end always gets its other end written. Mirror: a lone end that the deletion source of truth finds left over from a deleted edge is removed instead.',
+  deletionWinner: 'With mirrored deletions, how a lone end is judged. Declared: an end written with the inverse name lost its declared end and is removed; one written with the declared name is completed. Last edited: an end is removed when the note at its other end changed after its own note.',
 };
 
 const INDEX_FOLDERS_DESC = 'Only notes in these folders are indexed, one folder per line. Leave empty to index the whole vault. The schema folder is always indexed.';
@@ -344,13 +348,13 @@ export class ObsigraphSettingTab extends PluginSettingTab {
       .setDesc(INVERSE_DESCS.heading)
       .addText((t) => t.setPlaceholder(DEFAULT_INVERSE_HEADING).setValue(this.plugin.settings.inverseHeading).onChange((v) => this.setControlValue('inverseHeading', v)));
     new Setting(containerEl)
-      .setName('Inverse edge source of truth')
-      .setDesc(INVERSE_DESCS.winner)
+      .setName('Inverse edge properties: source of truth')
+      .setDesc(INVERSE_DESCS.propertyWinner)
       .addDropdown((d) =>
         d
           .addOptions({ declared: 'Declared end', 'last-edited': 'Last edited note' })
-          .setValue(this.plugin.settings.inverseWinner)
-          .onChange((v) => this.setControlValue('inverseWinner', v)),
+          .setValue(this.plugin.settings.inversePropertyWinner)
+          .onChange((v) => this.setControlValue('inversePropertyWinner', v)),
       );
     new Setting(containerEl)
       .setName('Inverse edge deletions')
@@ -360,6 +364,15 @@ export class ObsigraphSettingTab extends PluginSettingTab {
           .addOptions({ keep: 'Keep lone ends', mirror: 'Mirror deletions' })
           .setValue(this.plugin.settings.inverseDeletions)
           .onChange((v) => this.setControlValue('inverseDeletions', v)),
+      );
+    new Setting(containerEl)
+      .setName('Inverse edge deletions: source of truth')
+      .setDesc(INVERSE_DESCS.deletionWinner)
+      .addDropdown((d) =>
+        d
+          .addOptions({ declared: 'Declared end', 'last-edited': 'Last edited note' })
+          .setValue(this.plugin.settings.inverseDeletionWinner)
+          .onChange((v) => this.setControlValue('inverseDeletionWinner', v)),
       );
   }
 
@@ -465,8 +478,9 @@ export class ObsigraphSettingTab extends PluginSettingTab {
           { name: 'Write inverse edges on save', desc: INVERSE_DESCS.onSave, control: { type: 'toggle', key: 'inverseOnSave' } },
           { name: 'Inverse edge placement', desc: INVERSE_DESCS.placement, control: { type: 'dropdown', key: 'inversePlacement', options: { heading: 'Under a heading', end: 'End of the note', frontmatter: 'Frontmatter' } } },
           { name: 'Inverse edge heading', desc: INVERSE_DESCS.heading, control: { type: 'text', key: 'inverseHeading', placeholder: DEFAULT_INVERSE_HEADING } },
-          { name: 'Inverse edge source of truth', desc: INVERSE_DESCS.winner, control: { type: 'dropdown', key: 'inverseWinner', options: { declared: 'Declared end', 'last-edited': 'Last edited note' } } },
+          { name: 'Inverse edge properties: source of truth', desc: INVERSE_DESCS.propertyWinner, control: { type: 'dropdown', key: 'inversePropertyWinner', options: { declared: 'Declared end', 'last-edited': 'Last edited note' } } },
           { name: 'Inverse edge deletions', desc: INVERSE_DESCS.deletions, control: { type: 'dropdown', key: 'inverseDeletions', options: { keep: 'Keep lone ends', mirror: 'Mirror deletions' } } },
+          { name: 'Inverse edge deletions: source of truth', desc: INVERSE_DESCS.deletionWinner, control: { type: 'dropdown', key: 'inverseDeletionWinner', options: { declared: 'Declared end', 'last-edited': 'Last edited note' } } },
         ],
       },
     ];

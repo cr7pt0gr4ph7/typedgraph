@@ -1,11 +1,12 @@
-import { applyInverseEdits, canonicalType, edgeSemantics, isPlain, planInverseSync, type DeletionPolicy, type Graph, type InverseAction, type InversePlacement, type MismatchWinner, type SchemaSet } from '@obsigraph/core';
+import { applyInverseEdits, canonicalType, edgeSemantics, isPlain, planInverseSync, type DeletionPolicy, type Graph, type InverseAction, type InversePlacement, type SchemaSet, type SourceOfTruth } from '@obsigraph/core';
 
 /** The inverse-edge options as the plugin stores them. */
 export interface InverseSettings {
   inverseOnSave: boolean;
   inversePlacement: InversePlacement;
   inverseHeading: string;
-  inverseWinner: MismatchWinner;
+  inversePropertyWinner: SourceOfTruth;
+  inverseDeletionWinner: SourceOfTruth;
   inverseDeletions: DeletionPolicy;
 }
 
@@ -49,7 +50,8 @@ export async function syncInverseEdges(graph: Graph, set: SchemaSet, files: Sync
   const plan = planInverseSync(graph, set, (p) => texts.get(p) ?? null, {
     placement: settings.inversePlacement,
     heading: settings.inverseHeading,
-    winner: settings.inverseWinner,
+    propertyWinner: settings.inversePropertyWinner,
+    deletionWinner: settings.inverseDeletionWinner,
     deletions: settings.inverseDeletions,
     mtime: (p) => files.mtime(p),
     only,

@@ -3,7 +3,7 @@ import { Graph, schemasFromGraph, splitFrontmatter } from '@obsigraph/core';
 import { parse as parseYaml } from 'yaml';
 import { OnSaveSync, syncInverseEdges, type InverseSettings, type SyncFiles } from '../src/inverse-sync';
 
-const SETTINGS: InverseSettings = { inverseOnSave: true, inversePlacement: 'heading', inverseHeading: 'Relations', inverseWinner: 'declared', inverseDeletions: 'keep' };
+const SETTINGS: InverseSettings = { inverseOnSave: true, inversePlacement: 'heading', inverseHeading: 'Relations', inversePropertyWinner: 'declared', inverseDeletionWinner: 'declared', inverseDeletions: 'keep' };
 
 function vault(files: Record<string, string>) {
   const texts = new Map(Object.entries({ 'Types/Edges.md': '---\nedgeTypes:\n  worksAt: {inverseEdge: hasEmployee}\n---\n', ...files }));

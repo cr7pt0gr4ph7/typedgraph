@@ -43,12 +43,12 @@ it('lists missing ends as a dry run and writes them with --write', async () => {
 });
 
 // @tg: verifies:: [[tests/inverse-edges#tg inverses writes on request]] {level: integration}
-it('takes the placement, winner and deletions at run time', async () => {
+it('takes the placement, the two sources of truth and deletions at run time', async () => {
   const dir = folder({ ...VAULT, 'Acme.md': '- hasEmployee:: [[Ada]] {role: manager}\n- hasEmployee:: [[Bob]]\n', 'Bob.md': '' });
   utimesSync(join(dir, 'Ada.md'), 1000, 1000);
   utimesSync(join(dir, 'Bob.md'), 1000, 1000);
   utimesSync(join(dir, 'Acme.md'), 2000, 2000);
-  const r = await tg(dir, '--json', 'inverses', '--winner', 'last-edited', '--deletions', 'mirror', '--placement', 'frontmatter');
+  const r = await tg(dir, '--json', 'inverses', '--property-winner', 'last-edited', '--deletions', 'mirror', '--deletion-winner', 'last-edited', '--placement', 'frontmatter');
   const actions = (JSON.parse(r.out) as { actions: { kind: string; path: string }[] }).actions;
   expect(actions.map((a) => [a.kind, a.path]).sort()).toEqual([
     ['add', 'Bob.md'],

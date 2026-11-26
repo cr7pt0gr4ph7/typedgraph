@@ -29,5 +29,5 @@
 ## 6. Maintaining inverse edges
 
 - [x] 6.1 `planInverseSync` and `applyInverseEdits` in core: add missing ends (heading, end or frontmatter), fix mismatches (`declared` or `last-edited`), mirror deletions on request
-- [x] 6.2 `tg inverses [--write]` with `--placement`, `--heading`, `--winner` and `--deletions`
+- [x] 6.2 `tg inverses [--write]` with `--placement`, `--heading`, `--property-winner`, `--deletions` and `--deletion-winner`
 - [x] 6.3 Obsidian plugin: a command and an on-save option, with the same choices as settings

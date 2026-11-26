@@ -67,8 +67,8 @@ describe('settings tab', () => {
     const { t, plugin } = tab();
     const items = t.getSettingDefinitions().flatMap((g) => ('items' in g ? (g.items ?? []) : [g]));
     const keys = items.flatMap((i) => (i && 'control' in i && i.control ? [i.control.key] : []));
-    expect(keys).toEqual(expect.arrayContaining(['inverseOnSave', 'inversePlacement', 'inverseHeading', 'inverseWinner', 'inverseDeletions']));
-    expect([plugin.settings.inverseOnSave, plugin.settings.inversePlacement, plugin.settings.inverseWinner, plugin.settings.inverseDeletions]).toEqual([false, 'heading', 'declared', 'keep']);
+    expect(keys).toEqual(expect.arrayContaining(['inverseOnSave', 'inversePlacement', 'inverseHeading', 'inversePropertyWinner', 'inverseDeletions', 'inverseDeletionWinner']));
+    expect([plugin.settings.inverseOnSave, plugin.settings.inversePlacement, plugin.settings.inversePropertyWinner, plugin.settings.inverseDeletions, plugin.settings.inverseDeletionWinner]).toEqual([false, 'heading', 'declared', 'keep', 'declared']);
     await t.setControlValue('inverseHeading', '  ');
     expect(plugin.settings.inverseHeading).toBe('Relations');
   });

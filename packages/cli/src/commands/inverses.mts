@@ -11,13 +11,13 @@ import {
   schemasFromGraph,
   type DeletionPolicy,
   type InversePlacement,
-  type MismatchWinner,
+  type SourceOfTruth,
   type NoteInput,
 } from '@obsigraph/core';
 import { listNotes, parseYaml, readNote } from '@obsigraph/node-vault';
 import { EXIT_ERROR, EXIT_FINDINGS, EXIT_OK, register, type Command, type Ctx } from '../cli.mjs';
 
-const USAGE = 'inverses [--vault dir] [--schema-folder Types] [--write] [--placement heading|end|frontmatter] [--heading Relations] [--winner declared|last-edited] [--deletions keep|mirror] [--json]';
+const USAGE = 'inverses [--vault dir] [--schema-folder Types] [--write] [--placement heading|end|frontmatter] [--heading Relations] [--property-winner declared|last-edited] [--deletions keep|mirror] [--deletion-winner declared|last-edited] [--json]';
 
 const str = (flags: Map<string, string | true>, k: string) => (typeof flags.get(k) === 'string' ? (flags.get(k) as string) : undefined);
 
@@ -37,9 +37,10 @@ function choice<T extends string>(ctx: Ctx, flags: Map<string, string | true>, k
 // @lat: [[cli#Inverse edges]]
 async function runInverses(ctx: Ctx, flags: Map<string, string | true>): Promise<number> {
   const placement = choice<InversePlacement>(ctx, flags, 'placement', ['heading', 'end', 'frontmatter'], 'heading');
-  const winner = choice<MismatchWinner>(ctx, flags, 'winner', ['declared', 'last-edited'], 'declared');
+  const propertyWinner = choice<SourceOfTruth>(ctx, flags, 'property-winner', ['declared', 'last-edited'], 'declared');
+  const deletionWinner = choice<SourceOfTruth>(ctx, flags, 'deletion-winner', ['declared', 'last-edited'], 'declared');
   const deletions = choice<DeletionPolicy>(ctx, flags, 'deletions', ['keep', 'mirror'], 'keep');
-  if (!placement || !winner || !deletions) return EXIT_ERROR;
+  if (!placement || !propertyWinner || !deletions || !deletionWinner) return EXIT_ERROR;
   const vault = resolve(ctx.cwd, str(flags, 'vault') ?? '.');
   if (!existsSync(vault) || !statSync(vault).isDirectory()) {
     ctx.err(`${vault} is not a directory\n`);
@@ -55,7 +56,8 @@ async function runInverses(ctx: Ctx, flags: Map<string, string | true>): Promise
   const plan = planInverseSync(graph, set, (p) => texts.get(p) ?? null, {
     placement,
     heading: str(flags, 'heading') ?? DEFAULT_INVERSE_HEADING,
-    winner,
+    propertyWinner,
+    deletionWinner,
     deletions,
     mtime: (p) => {
       try {
@@ -88,7 +90,7 @@ export const inverses: Command = {
   name: 'inverses',
   summary: 'Write the missing end of inverse and symmetric edges in a vault, and fix ends that disagree (dry run unless --write)',
   usage: USAGE,
-  flags: { vault: 'string', 'schema-folder': 'string', write: 'bool', placement: 'string', heading: 'string', winner: 'string', deletions: 'string', 'frontmatter-edges': 'bool' },
+  flags: { vault: 'string', 'schema-folder': 'string', write: 'bool', placement: 'string', heading: 'string', 'property-winner': 'string', deletions: 'string', 'deletion-winner': 'string', 'frontmatter-edges': 'bool' },
   noProject: true,
   run(ctx, args, flags) {
     if (args.length) {

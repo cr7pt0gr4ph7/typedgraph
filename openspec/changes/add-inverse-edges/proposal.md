@@ -11,7 +11,7 @@ Many relations are read from both of their ends: a part names its whole (`part_o
 - `tg ontology` lists the inverse name of each edge type and marks symmetric ones. `tg ontology check` accepts inverse names, checks their ends swapped, and reports `inverse-mismatch`.
 - Cypher: a pattern with an inverse name matches the declared edge the other way round, and a symmetric edge type matches in both directions. This applies to `tg cypher`, the plugin and the sidecar's built-in engine.
 - SHACL: the export writes `inverseEdge` as the `tgs:inverseEdge` annotation on the edge shape, and the import reads it back.
-- Maintaining both ends: `tg inverses [--write]`, an Obsidian command and an on-save option write the missing end of each inverse or symmetric edge into the note at its other end (under a heading, at the end or in frontmatter) and fix property mismatches. The source of truth is the declared end or the last-edited note, and deletions can optionally be mirrored. No marker is written.
+- Maintaining both ends: `tg inverses [--write]`, an Obsidian command and an on-save option write the missing end of each inverse or symmetric edge into the note at its other end (under a heading, at the end or in frontmatter) and fix property mismatches. Separate options pick the source of truth for properties and for deletions (the declared end or the last-edited note), and deletions can optionally be mirrored. No marker is written.
 - The VS Code backlinks view groups each incoming edge under the name it has from the open note: an incoming `worksAt` is listed as `hasEmployee`.
 
 ## Capabilities

@@ -38,7 +38,7 @@ Validation SHALL check endpoints, edge properties and edge counts on the canonic
 - **THEN** `wrong-source-type` reports that `worksAt` starts at Person
 
 ### Requirement: Maintain inverse edges
-The system SHALL offer to write the missing end of each inverse or symmetric edge into the Markdown note at its other end, with the edge's properties, under a configurable heading (default `Relations`, created when missing), at the end of the note, or as a frontmatter link (without properties), as chosen at run time. When the two ends differ in properties, the end chosen by the `winner` rule SHALL keep its properties and the other end's property block SHALL be rewritten: `declared` picks the end written with the declared name, and `last-edited` picks the end in the more recently modified note. With `deletions: mirror`, a lone end that the `winner` rule finds left over SHALL be removed instead of completed: under `declared`, an end written with the inverse name, and under `last-edited`, an end whose other note was modified after its own. With the default `deletions: keep`, nothing SHALL be removed. Written lines SHALL carry no marker, and a run on a consistent vault SHALL change nothing.
+The system SHALL offer to write the missing end of each inverse or symmetric edge into the Markdown note at its other end, with the edge's properties, under a configurable heading (default `Relations`, created when missing), at the end of the note, or as a frontmatter link (without properties), as chosen at run time. A source of truth is either `declared`, the end written with the declared name, or `last-edited`, the end in the more recently modified note. Two sources of truth SHALL be chosen independently. When the two ends differ in properties, the end chosen by `propertyWinner` SHALL keep its properties and the other end's property block SHALL be rewritten. With `deletions: mirror`, a lone end that `deletionWinner` finds left over SHALL be removed instead of completed: under `declared`, an end written with the inverse name, and under `last-edited`, an end whose other note was modified after its own. With the default `deletions: keep`, nothing SHALL be removed. Written lines SHALL carry no marker, and a run on a consistent vault SHALL change nothing.
 
 #### Scenario: Missing end written under a heading
 - **WHEN** Ada writes `worksAt:: [[Acme]] {role: engineer}` and Acme's note has no `hasEmployee` line
@@ -49,13 +49,17 @@ The system SHALL offer to write the missing end of each inverse or symmetric edg
 - **THEN** the line is appended at the end of the note, or `hasEmployee: "[[Ada]]"` is added to its frontmatter
 
 #### Scenario: Declared direction wins
-- **WHEN** Ada writes `{role: engineer}` and Acme writes `{role: manager}` and the winner is `declared`
+- **WHEN** Ada writes `{role: engineer}` and Acme writes `{role: manager}` and `propertyWinner` is `declared`
 - **THEN** Acme's line is rewritten to `{role: engineer}`
 
 #### Scenario: Last edited wins
-- **WHEN** the same mismatch is synced with winner `last-edited` and Acme's note is newer
+- **WHEN** the same mismatch is synced with `propertyWinner` `last-edited` and Acme's note is newer
 - **THEN** Ada's line is rewritten to `{role: manager}`
 
 #### Scenario: Deletion mirrored
-- **WHEN** Acme writes `hasEmployee:: [[Ada]]`, Ada's note no longer has `worksAt:: [[Acme]]`, and deletions are `mirror` with winner `declared`
+- **WHEN** Acme writes `hasEmployee:: [[Ada]]`, Ada's note no longer has `worksAt:: [[Acme]]`, and deletions are `mirror` with `deletionWinner` `declared`
 - **THEN** Acme's line is removed
+
+#### Scenario: Sources of truth chosen separately
+- **WHEN** `propertyWinner` is `last-edited` and `deletionWinner` is `declared`
+- **THEN** mismatched properties follow the newer note while lone ends are judged by the declared side

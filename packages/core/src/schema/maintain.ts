@@ -5,8 +5,8 @@ import type { SchemaSet } from './schema.js';
 
 /** Where a missing inverse side is written in the other note. */
 export type InversePlacement = 'heading' | 'end' | 'frontmatter';
-/** Which end wins when the two ends of one edge disagree on properties. */
-export type MismatchWinner = 'declared' | 'last-edited';
+/** Which end is the source of truth: the end written with the declared name, or the end in the more recently modified note. */
+export type SourceOfTruth = 'declared' | 'last-edited';
 /** What happens to a line the maintainer wrote once the edge it mirrors is gone. */
 export type DeletionPolicy = 'keep' | 'mirror';
 
@@ -15,15 +15,16 @@ export interface InverseSyncOptions {
   placement?: InversePlacement;
   /** Heading the `heading` placement writes under, created at the end of the note when missing; default `Relations`. */
   heading?: string;
+  /** Whose properties are kept when the two ends of one edge differ; default `declared`. */
+  propertyWinner?: SourceOfTruth;
   /**
-   * Which end is the source of truth, default `declared`: for a property mismatch, the end whose
-   * properties are kept; with `deletions: mirror`, whether a lone end is new (its other end is added)
-   * or left over (it is removed).
+   * With `deletions: mirror`, whether a lone end is new (its other end is added) or left over from a
+   * deleted edge (it is removed); default `declared`.
    */
-  winner?: MismatchWinner;
+  deletionWinner?: SourceOfTruth;
   /** Default `keep`: lone ends are always completed and nothing is removed. */
   deletions?: DeletionPolicy;
-  /** Modification time of a note, for the `last-edited` winner; null when unknown. */
+  /** Modification time of a note, for `last-edited`; null when unknown. */
   mtime?: (path: string) => number | null;
   /** Only act on edges written in these notes (and on maintainer lines that mirror them), e.g. the note just saved. */
   only?: ReadonlySet<string>;
@@ -62,7 +63,7 @@ const isNotePath = (p: string) => p.endsWith('.md') && !p.includes('#');
 /**
  * Plan how to keep both ends of inverse and symmetric edges written (TGS 0.7): add the missing end of
  * each edge to the note at its other end and rewrite the properties of the end that loses a mismatch.
- * With `deletions: mirror`, a lone end that the `winner` rule finds left over is removed instead: under
+ * With `deletions: mirror`, a lone end that the `deletionWinner` rule finds left over is removed instead: under
  * `declared`, an end written with the inverse name (its declared end was deleted); under `last-edited`,
  * an end whose other note changed after its own. Only Markdown notes take part; edge notes, sections,
  * stubs and AsciiDoc notes are skipped. Nothing is written here.
@@ -74,7 +75,8 @@ export function planInverseSync(graph: Graph, set: SchemaSet, text: (path: strin
   if (isPlain(sem)) return plan;
   const placement = opts.placement ?? 'heading';
   const heading = opts.heading?.trim() || DEFAULT_INVERSE_HEADING;
-  const winner = opts.winner ?? 'declared';
+  const propertyWinner = opts.propertyWinner ?? 'declared';
+  const deletionWinner = opts.deletionWinner ?? 'declared';
   const deletions = opts.deletions ?? 'keep';
   const inScope = (p: string) => !opts.only || opts.only.has(p);
   const edit = (path: string, e: InverseEdit) => (plan.edits.get(path) ?? plan.edits.set(path, []).get(path)!).push(e);
@@ -121,7 +123,7 @@ export function planInverseSync(graph: Graph, set: SchemaSet, text: (path: strin
       if (samePropsBut(w.props, o.props)) continue;
       if (!inScope(w.source) && !inScope(o.source)) continue;
       let [win, lose] = [w, o];
-      if (winner === 'last-edited') {
+      if (propertyWinner === 'last-edited') {
         const tw = opts.mtime?.(w.source) ?? null;
         const to = opts.mtime?.(o.source) ?? null;
         if (tw !== null && to !== null && to > tw) [win, lose] = [o, w];
@@ -137,7 +139,7 @@ export function planInverseSync(graph: Graph, set: SchemaSet, text: (path: strin
     }
 
     const target = graph.node(w.target);
-    if (deletions === 'mirror' && target && !target.stub && isNotePath(w.target) && w.target !== w.source && leftOver(w, reversed, sem.symmetric.has(type), winner, opts.mtime)) {
+    if (deletions === 'mirror' && target && !target.stub && isNotePath(w.target) && w.target !== w.source && leftOver(w, reversed, sem.symmetric.has(type), deletionWinner, opts.mtime)) {
       if (!inScope(w.source) && !inScope(w.target)) continue;
       if (inFrontmatter(w, written) || linkCount(written) !== 1) act({ kind: 'skip', path: w.source, line: w.line, text: 'the other end was deleted, but this end is not a single-link edge line', cause });
       else {
@@ -199,7 +201,7 @@ export function applyInverseEdits(text: string, edits: readonly InverseEdit[]): 
  * with the inverse name is left over (a symmetric type has no declared end, so never). Under
  * `last-edited`, it is left over when the note at its other end changed after the note holding it.
  */
-function leftOver(w: { source: string; target: string }, reversed: boolean, symmetric: boolean, winner: MismatchWinner, mtime?: (path: string) => number | null): boolean {
+function leftOver(w: { source: string; target: string }, reversed: boolean, symmetric: boolean, winner: SourceOfTruth, mtime?: (path: string) => number | null): boolean {
   if (winner === 'declared') return reversed && !symmetric;
   const own = mtime?.(w.source) ?? null;
   const other = mtime?.(w.target) ?? null;

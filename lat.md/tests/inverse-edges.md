@@ -53,19 +53,19 @@ The maintainer adds the missing end of an inverse or symmetric edge to the other
 
 ## Mismatches are fixed
 
-The losing end's property block is rewritten with the winner's properties, the winner being the declared end or the more recently edited note.
+The losing end's property block is rewritten with the winner's properties, the winner being the declared end or the more recently edited note; this choice is independent of the one for deletions.
 
 ## Deleted edges are mirrored on request
 
-With `deletions: mirror` a lone end found left over (written with the inverse name, or older than its other note) is removed; with `keep` it is completed.
+With `deletions: mirror` a lone end that the deletion source of truth finds left over (written with the inverse name, or older than its other note) is removed; with `keep` it is completed.
 
 ## tg inverses writes on request
 
-`tg inverses` lists missing and differing ends as a dry run (exit 1), writes them with `--write`, and takes placement, heading, winner and deletions as flags.
+`tg inverses` lists missing and differing ends as a dry run (exit 1), writes them with `--write`, and takes placement, heading, both sources of truth and deletions as flags.
 
 ## Plugin writes inverse edges on command and on save
 
-The Obsidian plugin syncs with its settings (placement, heading, source of truth, deletions; all off or declared by default), limited to saved notes, once saves pause and never for its own writes.
+The Obsidian plugin syncs with its settings (placement, heading, the two sources of truth, deletions; all off or declared by default), limited to saved notes, once saves pause and never for its own writes.
 
 ## Inverse edges survive SHACL
 

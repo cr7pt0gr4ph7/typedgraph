@@ -56,7 +56,7 @@ export type { DocumentFinding, DocumentFindingKind } from './elements/validate.j
 export { buildView, canonicalType, canonicalView, edgeSemantics, edgesFrom, isPlain, nameFrom, readsFrom, writtenAt } from './schema/inverse.js';
 export type { CanonicalView, EdgeSemantics } from './schema/inverse.js';
 export { applyInverseEdits, DEFAULT_INVERSE_HEADING, formatProps, planInverseSync } from './schema/maintain.js';
-export type { DeletionPolicy, InverseAction, InverseEdit, InversePlacement, InversePlan, InverseSyncOptions, MismatchWinner } from './schema/maintain.js';
+export type { DeletionPolicy, InverseAction, InverseEdit, InversePlacement, InversePlan, InverseSyncOptions, SourceOfTruth } from './schema/maintain.js';
 export { frontmatterClose, splitFrontmatter, toYaml } from './schema/frontmatter.js';
 export {
   compareLuhmann,

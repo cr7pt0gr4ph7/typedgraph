@@ -60,9 +60,9 @@ describe('maintaining inverse edges', () => {
     declared.sync();
     expect(declared.texts.get('Acme.md')).toBe('- hasEmployee:: [[Ada]] {role: engineer, since: 2020, id: e1} trailing\n');
     const last = vault(files);
-    last.sync({ winner: 'last-edited', mtime: (p) => (p === 'Acme.md' ? 2 : 1) });
+    last.sync({ propertyWinner: 'last-edited', mtime: (p) => (p === 'Acme.md' ? 2 : 1) });
     expect(last.texts.get('Ada.md')).toBe('- worksAt:: [[Acme]] {role: manager}\n');
-    expect(last.sync({ winner: 'last-edited', mtime: (p) => (p === 'Acme.md' ? 2 : 1) }).actions).toEqual([]);
+    expect(last.sync({ propertyWinner: 'last-edited', mtime: (p) => (p === 'Acme.md' ? 2 : 1) }).actions).toEqual([]);
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Deleted edges are mirrored on request]] {level: unit}
@@ -85,7 +85,7 @@ describe('maintaining inverse edges', () => {
     // mirror + last-edited: the end is left over when its other note changed later.
     const times: Record<string, number> = { 'Ada.md': 3, 'Acme.md': 2, 'Bob.md': 1 };
     const last = vault(files);
-    const plan = last.sync({ placement: 'end', deletions: 'mirror', winner: 'last-edited', mtime: (p) => times[p] ?? null });
+    const plan = last.sync({ placement: 'end', deletions: 'mirror', deletionWinner: 'last-edited', mtime: (p) => times[p] ?? null });
     expect(plan.actions.map((a) => [a.kind, a.path])).toEqual([
       ['remove', 'Acme.md'],
       ['remove', 'Bob.md'],
@@ -93,6 +93,28 @@ describe('maintaining inverse edges', () => {
     // Symmetric edges have no declared side, so declared never removes them.
     const sym = vault({ 'Ada.md': '- friendsWith:: [[Bob]]\n', 'Bob.md': '' });
     expect(sym.sync({ deletions: 'mirror' }).actions.map((a) => a.kind)).toEqual(['add']);
+  });
+
+  // @tg: verifies:: [[tests/inverse-edges#Mismatches are fixed]] {level: unit}
+  // @tg: verifies:: [[tests/inverse-edges#Deleted edges are mirrored on request]] {level: unit}
+  // @tg: verifies:: [[openspec:schema-notes#Maintain inverse edges#Sources of truth chosen separately]]
+  it('chooses the source of truth for properties and for deletions separately', () => {
+    const files = { 'Ada.md': '- worksAt:: [[Acme]] {role: engineer}\n', 'Acme.md': '- hasEmployee:: [[Ada]] {role: manager}\n- hasEmployee:: [[Bob]]\n', 'Bob.md': '' };
+    const times: Record<string, number> = { 'Ada.md': 1, 'Acme.md': 2, 'Bob.md': 3 };
+    const mtime = (p: string) => times[p] ?? null;
+    // Properties from the last-edited note (Acme), deletions by the declared side (Acme's lone hasEmployee is left over).
+    const a = vault(files);
+    expect(a.sync({ placement: 'end', deletions: 'mirror', propertyWinner: 'last-edited', deletionWinner: 'declared', mtime }).actions.map((x) => [x.kind, x.path])).toEqual([
+      ['update', 'Ada.md'],
+      ['remove', 'Acme.md'],
+    ]);
+    // Properties from the declared end, deletions by the last edit (Bob changed after Acme, so the lone end is left over too).
+    const b = vault(files);
+    expect(b.sync({ placement: 'end', deletions: 'mirror', propertyWinner: 'declared', deletionWinner: 'last-edited', mtime }).actions.map((x) => [x.kind, x.path])).toEqual([
+      ['update', 'Acme.md'],
+      ['remove', 'Acme.md'],
+    ]);
+    expect(b.texts.get('Acme.md')).toBe('- hasEmployee:: [[Ada]] {role: engineer}\n');
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Missing ends are written]] {level: unit}
