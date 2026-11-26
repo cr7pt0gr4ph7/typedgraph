@@ -49,7 +49,7 @@ ORDER BY hours DESC
 ## Features
 
 - **Typed, signed edges with properties.** `type:: [[Target]] {props}` works like Graph Link Types, so your existing lines keep working. A `-` prefix makes an edge negative, and edges can have stable or pinned ids.
-- **Typed nodes and schema notes.** Frontmatter `type` gives a note its labels. A note in `Types/` declares a type's properties, allowed edges, template and look.
+- **Typed nodes and schema notes.** Frontmatter `type` gives a note its labels. A note in `Types/` declares a type's properties, allowed edges, template and look. A type can inherit from abstract types with `is`, so `MATCH (a:LegalEntity)` finds people and companies alike.
 - **openCypher queries.** `MATCH`, `OPTIONAL MATCH`, `WITH`, aggregates, variable-length paths and path variables. Queries are read-only and errors are clear.
 - **Note variables and built-in metadata.** A block can use the note it sits in: `{{path}}`, `{{title}}`, `{{folder}}` and frontmatter as `{{fm.status}}` become Cypher literals, so `MATCH (me {path: {{path}}})-[r]-(x) RETURN me, r, x` works in any note. Every node has `path`, `title`, `stub` and its frontmatter, and every edge has `r.sign`, `r.id` and its `{props}`, with no schema. The Graph view binds `$activeFile`. See the [query cheat sheet](https://typedgraph.org/query-cheatsheet.html).
 - **Graph or table, live.** Results render as a labeled, styled graph or a table, and refresh as you edit.

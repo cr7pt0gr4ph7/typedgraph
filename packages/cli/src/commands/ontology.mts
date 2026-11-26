@@ -1,4 +1,4 @@
-import { buildLatGraph, canonicalType, canonicalView, checkDocuments, edgeSemantics, isPlain, ELEMENT_LABEL, readSchemaNote, schemaSetFromNotes, type ElementSchema, type Graph, type GraphNode, type PropertySchema, type SchemaSet, type SectionSchema } from '@obsigraph/core';
+import { buildLatGraph, canonicalType, canonicalView, checkDocuments, edgeSemantics, isPlain, ELEMENT_LABEL, readSchemaNote, schemaSetFromNotes, subtypesOf, withSupertypes, type ElementSchema, type Graph, type GraphNode, type PropertySchema, type SchemaSet, type SectionSchema } from '@obsigraph/core';
 import { EXIT_ERROR, EXIT_FINDINGS, EXIT_OK, register, type Command, type Ctx } from '../cli.mjs';
 import { NoLatDir, Project } from '../project.mjs';
 import { readSchemaNotes } from './schema.mjs';
@@ -36,6 +36,12 @@ const propJson = (p: PropertySchema) => ({ name: p.name, kind: p.kind, many: p.m
 
 function elementJson(e: ElementSchema): Record<string, unknown> {
   return { tag: e.tag, description: e.description, types: e.types, required: e.required, many: e.many, node: e.node, attributes: e.attributes.map(propJson), elements: e.elements.map(elementJson) };
+}
+
+/** The supertype a property of `type` comes from, or null when the type declares it itself. */
+function inheritedFrom(set: SchemaSet, type: string, name: string): string | null {
+  if (set.declared.get(type)?.properties.some((p) => p.name === name)) return null;
+  return (set.supertypes.get(type) ?? []).find((s) => set.declared.get(s)?.properties.some((p) => p.name === name)) ?? null;
 }
 
 const sectionJson = (h: SectionSchema) => ({ heading: h.heading, description: h.description, required: h.required });
@@ -96,7 +102,10 @@ export function ontologyJson(set: SchemaSet, folder: string) {
       note: t.path,
       template: t.template,
       description: t.description ?? null,
-      properties: t.properties.map(propJson),
+      abstract: t.abstract === true,
+      is: t.is ?? [],
+      supertypes: set.supertypes.get(t.type) ?? [],
+      properties: t.properties.map((p) => ({ ...propJson(p), inheritedFrom: inheritedFrom(set, t.type, p.name) })),
       edges: t.edges?.map((e) => ({ type: e.type, targets: e.targets, many: e.many, required: e.required, description: e.description ?? null })) ?? null,
       elements: (t.elements ?? []).map(elementJson),
       sections: (t.sections ?? []).map(sectionJson),
@@ -126,13 +135,20 @@ function runList(ctx: Ctx, set: SchemaSet, folder: string): number {
     return EXIT_OK;
   }
   const out: string[] = [`Ontology from ${folder}: ${set.schemas.size} type${set.schemas.size === 1 ? '' : 's'}, ${set.edgeTypes.size} edge type${set.edgeTypes.size === 1 ? '' : 's'}`, '', 'Types'];
-  const props = (list: PropertySchema[]) =>
-    list.some((p) => p.description) ? ['    properties:', ...list.map((p) => `      ${describeProperty(p)}${p.description ? ` — ${p.description}` : ''}`)] : [`    properties: ${list.map(describeProperty).join('; ')}`];
+  const props = (list: PropertySchema[], from: (p: PropertySchema) => string | null = () => null) => {
+    const line = (p: PropertySchema) => `${describeProperty(p)}${from(p) ? ` from ${from(p)}` : ''}`;
+    return list.some((p) => p.description) ? ['    properties:', ...list.map((p) => `      ${line(p)}${p.description ? ` — ${p.description}` : ''}`)] : [`    properties: ${list.map(line).join('; ')}`];
+  };
   let documents = false;
   for (const t of set.schemas.values()) {
-    out.push(`  ${t.type}  (${t.path})`);
+    const kind = [t.abstract ? 'abstract' : '', t.is?.length ? `is ${t.is.join(', ')}` : ''].filter(Boolean).join(', ');
+    out.push(`  ${t.type}  (${t.path})${kind ? `  ${kind}` : ''}`);
     if (t.description) out.push(`    ${t.description}`);
-    if (t.properties.length) out.push(...props(t.properties));
+    if (t.abstract) {
+      const subs = subtypesOf(t.type, set);
+      out.push(`    Only for inheritance: write one of its subtypes as a type${subs.length ? ` (${subs.join(', ')})` : ''}; a query or edge rule on ${t.type} matches them all.`);
+    }
+    if (t.properties.length) out.push(...props(t.properties, (p) => inheritedFrom(set, t.type, p.name)));
     if (t.edges) out.push(`    edges: ${t.edges.length ? t.edges.map((e) => `${e.type} → ${e.targets?.join('|') ?? 'any'}`).join('; ') : 'none'}`);
     if (t.sections?.length) out.push('    sections:', ...t.sections.map((h) => `      ## ${h.heading}${h.required ? '  (required)' : ''}${h.description ? ` — ${h.description}` : ''}`));
     if (t.elements?.length) out.push('    elements:', ...elementLines(t.elements, '      '));
@@ -155,7 +171,7 @@ function runList(ctx: Ctx, set: SchemaSet, folder: string): number {
 }
 
 export interface OntologyFinding {
-  kind: 'unknown-edge' | 'inverse-mismatch' | 'wrong-source' | 'wrong-target' | 'undeclared-property' | 'value-not-allowed' | 'missing-element' | 'too-many-elements' | 'missing-attribute' | 'attribute-value-not-allowed' | 'unclosed-element' | 'missing-section';
+  kind: 'abstract-type' | 'unknown-edge' | 'inverse-mismatch' | 'wrong-source' | 'wrong-target' | 'undeclared-property' | 'value-not-allowed' | 'missing-element' | 'too-many-elements' | 'missing-attribute' | 'attribute-value-not-allowed' | 'unclosed-element' | 'missing-section';
   file: string;
   line: number;
   edge: string;
@@ -186,8 +202,8 @@ export function suggestEdgeName(name: string, declared: Iterable<string>): strin
   return best;
 }
 
-/** Ontology types of a node: its labels without the generic `Section`. */
-const typesOf = (n: GraphNode | undefined): string[] => (n ? n.labels.filter((l) => !GENERIC_LABELS.has(l)) : []);
+/** Ontology types of a node as written: its labels without the generic `Section` and the supertypes the hierarchy adds. */
+const writtenTypesOf = (graph: Graph, n: GraphNode | undefined): string[] => (n ? graph.writtenLabels(n.id).filter((l) => !GENERIC_LABELS.has(l)) : []);
 
 function where(graph: Graph, sourceId: string, line: number): { file: string; line: number } {
   const n = graph.node(sourceId);
@@ -197,11 +213,24 @@ function where(graph: Graph, sourceId: string, line: number): { file: string; li
 
 /** Typed edges in docs and code that the ontology does not allow. */
 // @tg: implements:: [[openspec:tg-cli#Ontology check]]
+// @tg: implements:: [[openspec:schema-notes#Abstract types]]
 export function checkOntology(graph: Graph, set: SchemaSet): OntologyFinding[] {
   if (set.schemas.size + set.edgeTypes.size === 0) return [];
   const declared = declaredEdgeNames(set);
   const sem = edgeSemantics(set);
   const out: OntologyFinding[] = [];
+  // A doc typed with an abstract type: reported once per file and type, at the first node that has it.
+  const seen = new Set<string>();
+  for (const n of graph.nodes()) {
+    for (const t of writtenTypesOf(graph, n)) {
+      if (!set.schemas.get(t)?.abstract) continue;
+      const at = where(graph, n.id, Number(n.props.startLine ?? n.props.line ?? 1));
+      if (seen.has(`${at.file}\0${t}`)) continue;
+      seen.add(`${at.file}\0${t}`);
+      const subs = subtypesOf(t, set);
+      out.push({ kind: 'abstract-type', ...at, edge: '', message: `type '${t}' is abstract; use one of its subtypes${subs.length ? ` (${subs.join(', ')})` : ''}` });
+    }
+  }
   for (const e of graph.edges()) {
     if (STRUCTURAL.has(e.type)) continue;
     const at = where(graph, e.source, e.line);
@@ -216,10 +245,10 @@ export function checkOntology(graph: Graph, set: SchemaSet): OntologyFinding[] {
     const et = set.edgeTypes.get(canonical.type);
     if (!et) continue;
     const [starts, ends] = canonical.reversed ? [et.to, et.from] : [et.from, et.to];
-    const from = typesOf(graph.node(e.source));
-    const to = typesOf(graph.node(e.target));
-    if (starts && from.length && !from.some((t) => starts.includes(t))) push('wrong-source', `'${e.type}' starts at ${starts.join(' or ')}, not ${from.join(', ')}`);
-    if (ends && to.length && !to.some((t) => ends.includes(t))) push('wrong-target', `'${e.type}' ends at ${ends.join(' or ')}, not ${to.join(', ')}`);
+    const from = writtenTypesOf(graph, graph.node(e.source));
+    const to = writtenTypesOf(graph, graph.node(e.target));
+    if (starts && from.length && !withSupertypes(from, set).some((t) => starts.includes(t))) push('wrong-source', `'${e.type}' starts at ${starts.join(' or ')}, not ${from.join(', ')}`);
+    if (ends && to.length && !withSupertypes(to, set).some((t) => ends.includes(t))) push('wrong-target', `'${e.type}' ends at ${ends.join(' or ')}, not ${to.join(', ')}`);
     const props = new Map(et.properties.map((p) => [p.name, p]));
     for (const [k, v] of Object.entries(e.props)) {
       if (BUILTIN_PROPS.has(k)) continue;

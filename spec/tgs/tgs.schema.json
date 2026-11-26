@@ -293,6 +293,14 @@
         },
         "sections": {
           "$ref": "#/$defs/sections"
+        },
+        "is": {
+          "description": "Supertypes this type inherits from; each must be an abstract type (TGS 0.7).",
+          "$ref": "#/$defs/names"
+        },
+        "abstract": {
+          "description": "A type only for inheritance: no note may have it as its type (TGS 0.7).",
+          "type": "boolean"
         }
       },
       "additionalProperties": false

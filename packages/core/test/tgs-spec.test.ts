@@ -6,6 +6,7 @@ import { parse as parseYaml } from 'yaml';
 import {
   DEFAULT_BASE_IRI,
   TGS_NAMESPACE,
+  TGS_VERSION,
   Graph,
   iriOf,
   noteDocumentDiagnostics,
@@ -67,6 +68,8 @@ function declarations(set: SchemaSet) {
         ...(t.description ? { description: t.description } : {}),
         ...(t.elements?.length ? { elements: t.elements } : {}),
         ...(t.sections?.length ? { sections: t.sections } : {}),
+        ...(t.abstract ? { abstract: true } : {}),
+        ...(t.is?.length ? { is: t.is, supertypes: set.supertypes.get(t.type) ?? [] } : {}),
       })),
     edgeTypes: [...set.edgeTypes.values()]
       .sort((a, b) => a.type.localeCompare(b.type))
@@ -97,7 +100,7 @@ describe('TGS conformance examples', () => {
     if (WRITE) {
       const old = existsSync(expectedPath) ? (JSON.parse(readFileSync(expectedPath, 'utf8')) as { invalidAgainstJsonSchema?: string[] }) : {};
       writeFileSync(expectedPath, `${JSON.stringify({ invalidAgainstJsonSchema: old.invalidAgainstJsonSchema ?? [], ...actual }, null, 2)}\n`);
-      if (name.includes('shacl')) writeFileSync(shapesPath, ttl);
+      if (name.includes('shacl') || name.includes('inheritance')) writeFileSync(shapesPath, ttl);
     }
     const expected = JSON.parse(readFileSync(expectedPath, 'utf8')) as typeof actual & { invalidAgainstJsonSchema: string[] };
     expect(actual).toEqual({ types: expected.types, edgeTypes: expected.edgeTypes, diagnostics: expected.diagnostics });
@@ -192,6 +195,7 @@ describe('TGS AsciiDoc notes', () => {
   // @tg: verifies:: [[openspec:tgs-spec#TGS 0.6 published#Published 0.6 at typedgraph.org]] {level: unit}
   // @lat: [[tests/tgs-spec#Version 0.6 published at typedgraph.org]]
   it('publishes 0.6 with every identifier under typedgraph.org', () => {
+    // 0.6 is archived as published.
     const spec = readFileSync(join(SPEC, 'archive/v0.6/SPEC.md'), 'utf8');
     expect(spec).toContain('# Typed Graph Schema (TGS) 0.6');
     expect(spec).toContain('| **This version** | `https://typedgraph.org/spec/tgs/v0.6/` |');
@@ -219,6 +223,24 @@ describe('TGS AsciiDoc notes', () => {
       const expected = JSON.parse(readFileSync(join(SPEC, 'archive/v0.6/examples', name, 'expected.json'), 'utf8')) as { edgeTypes: unknown };
       expect(declarations(set).edgeTypes, name).toEqual(expected.edgeTypes);
     }
+  });
+
+  // @tg: verifies:: [[openspec:tgs-spec#TGS 0.7 published#Published 0.7 with type inheritance]] {level: unit}
+  // @lat: [[tests/tgs-spec#Version 0.7 adds type inheritance]]
+  it('publishes 0.7 with is and abstract, and archives 0.6 unchanged', () => {
+    const spec = readFileSync(join(SPEC, 'SPEC.md'), 'utf8');
+    expect(spec).toContain('# Typed Graph Schema (TGS) 0.7');
+    expect(spec).toContain('| **This version** | `https://typedgraph.org/spec/tgs/v0.7/` |');
+    expect(spec).toContain('### 4.10 Inheritance');
+    const schema = JSON.parse(readFileSync(join(SPEC, 'tgs.schema.json'), 'utf8'));
+    expect(schema.$id).toBe('https://typedgraph.org/spec/tgs/v0.7/tgs.schema.json');
+    expect(Object.keys(schema.$defs.typeDeclaration.properties)).toEqual(expect.arrayContaining(['is', 'abstract']));
+    expect(TGS_VERSION).toBe('0.7');
+    expect(readFileSync(join(__dirname, '../../../site/build-spec.mjs'), 'utf8')).toContain("const VERSION = '0.7'");
+    // 0.6 notes are 0.7 notes, and the 0.6 JSON Schema rejects the new keys.
+    const v06 = ajv.compile({ ...JSON.parse(readFileSync(join(SPEC, 'archive/v0.6/tgs.schema.json'), 'utf8')), $id: 'urn:test:v0.6' });
+    expect(v06({ schemas: { A: { abstract: true }, B: { is: 'A' } } })).toBe(false);
+    expect(validateJson({ schemas: { A: { abstract: true }, B: { is: 'A' } } })).toBe(true);
   });
 
   // @tg: verifies:: [[openspec:tgs-spec#Namespace IRI#Former namespace imported]] {level: unit}

@@ -1,0 +1,4 @@
+---
+type: LegalEntity
+name: Somebody
+---

@@ -15,6 +15,8 @@ Test specifications whose leaf sections must each be referenced by exactly one `
 - [[graph-view]] — view-state behaviors from the graph-view spec
 - [[schema-notes]] — schema behaviors from the schema-notes spec
 - [[inverse-edges]] — inverse and symmetric edge types, the canonical edge view and its checks
+
+- [[type-inheritance]] — `is` and `abstract`: inherited declarations, supertype labels, diagnostics and SHACL
 - [[visualization-config]] — style precedence behaviors from the visualization-config spec
 - [[edge-embeds]] — embed behaviors from the edge-embeds spec
 - [[cypher-extensions]] — WITH, OPTIONAL MATCH, paths and aggregation behaviors

@@ -107,6 +107,10 @@ export class Graph implements GraphView {
   private readonly adocSections = new Map<string, AsciidocSection[]>();
   /** Headings and XML elements of Markdown notes, for checking documents against their type. */
   private readonly outlines = new Map<string, NoteOutline>();
+  /** Labels as written in each note, before supertypes are added. */
+  private readonly written = new Map<string, string[]>();
+  /** Type name -> its supertypes, nearest first (TGS 0.7 `is`). */
+  private supertypes: ReadonlyMap<string, readonly string[]> = new Map();
 
   constructor(
     private readonly resolve: LinkResolver,
@@ -125,6 +129,40 @@ export class Graph implements GraphView {
   /** A counter that changes whenever the graph does. */
   get version(): number {
     return this.changes;
+  }
+
+  /** The labels a note was written with, without the supertypes inferred from `is` declarations. */
+  writtenLabels(id: string): string[] {
+    return this.written.get(id) ?? this.nodeMap.get(id)?.labels ?? [];
+  }
+
+  /**
+   * Set the type hierarchy: every node then also carries the supertypes of its
+   * written labels, so a match on a base type finds notes of every derived type.
+   * Nodes whose labels change are reported to change listeners.
+   */
+  // @tg: implements:: [[openspec:schema-notes#Base type queries]]
+  setTypeHierarchy(supertypes: ReadonlyMap<string, readonly string[]> | null): void {
+    const next = supertypes ?? new Map<string, readonly string[]>();
+    if (sameHierarchy(this.supertypes, next)) return;
+    this.supertypes = next;
+    const touched = new Set<string>();
+    for (const [id, labels] of this.written) {
+      const node = this.nodeMap.get(id);
+      if (!node) continue;
+      const expanded = this.expandLabels(labels);
+      if (expanded.length === node.labels.length && expanded.every((l, i) => l === node.labels[i])) continue;
+      node.labels = expanded;
+      touched.add(id);
+    }
+    if (touched.size) this.emit(touched);
+  }
+
+  private expandLabels(labels: string[]): string[] {
+    if (this.supertypes.size === 0) return labels;
+    const out = [...labels];
+    for (const l of labels) for (const s of this.supertypes.get(l) ?? []) if (!out.includes(s)) out.push(s);
+    return out;
   }
 
   get size(): { nodes: number; edges: number } {
@@ -215,9 +253,11 @@ export class Graph implements GraphView {
     else this.outlines.delete(note.path);
     // A host that cannot read AsciiDoc metadata hands none; the parsed properties stand in.
     const frontmatter = note.frontmatter ?? adoc?.meta ?? null;
+    const written = labelsOf(frontmatter);
+    this.written.set(note.path, written);
     this.nodeMap.set(note.path, {
       id: note.path,
-      labels: labelsOf(frontmatter),
+      labels: this.expandLabels(written),
       // A frontmatter `title` (OKF's display name) wins over the document title and the file name.
       props: { ...(frontmatter ?? {}), path: note.path, title: frontmatterTitle(frontmatter) ?? adoc?.title ?? titleOf(note.path) },
       stub: false,
@@ -243,6 +283,7 @@ export class Graph implements GraphView {
     const fm = note.frontmatter ?? {};
     const wasNode = this.nodeMap.has(note.path);
     this.nodeMap.delete(note.path);
+    this.written.delete(note.path);
     const from = endpointLink(fm.from, note.path);
     const to = endpointLink(fm.to, note.path);
     const rawType = typeof fm.edgeType === 'string' ? fm.edgeType.trim() : '';
@@ -281,6 +322,7 @@ export class Graph implements GraphView {
     this.files.delete(path);
     this.outlines.delete(path);
     this.nodeMap.delete(path);
+    this.written.delete(path);
     this.incompleteEdgeNotes.delete(path);
     this.adocSections.delete(path);
     const touched = new Set([path]);
@@ -445,6 +487,15 @@ export class Graph implements GraphView {
     const list = [...paths];
     for (const fn of this.listeners) fn(list);
   }
+}
+
+function sameHierarchy(a: ReadonlyMap<string, readonly string[]>, b: ReadonlyMap<string, readonly string[]>): boolean {
+  if (a.size !== b.size) return false;
+  for (const [k, v] of a) {
+    const w = b.get(k);
+    if (!w || w.length !== v.length || v.some((x, i) => x !== w[i])) return false;
+  }
+  return true;
 }
 
 // @lat: [[graph-model#Node types]]

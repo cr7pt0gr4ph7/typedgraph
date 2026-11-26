@@ -1,7 +1,7 @@
 import { Parser, type Quad, type Term } from 'n3';
 import { BUILTIN_PREFIXES, DEFAULT_BASE_IRI, TGS_FORMER_NAMESPACES, readElementDeclarations, readSectionDeclarations, type EdgeRule, type EdgeTypeSchema, type PropertyKind, type PropertySchema, type TypeSchema } from '../schema/schema.js';
 import { compact } from './export.js';
-import { DATATYPE_KIND, localName, RDF, SH, TGS, XSD } from './vocab.js';
+import { DATATYPE_KIND, localName, RDF, RDFS, SH, TGS, XSD } from './vocab.js';
 
 export interface ShaclImportOptions {
   /** Base IRI that names declarations without a `uri` (default `urn:tgs:`). */
@@ -46,7 +46,7 @@ function currentTgs(iri: string): string {
 }
 
 /** Predicates the import understands on a node shape and on a property shape. */
-const NODE_KNOWN = new Set([`${RDF}type`, `${SH}targetClass`, `${SH}name`, `${SH}property`, `${TGS}note`, `${TGS}edgesClosed`, `${TGS}template`, `${TGS}templateBody`, `${TGS}visualization`, `${SH}description`, `${TGS}elements`, `${TGS}sections`, `${TGS}inverseEdge`]);
+const NODE_KNOWN = new Set([`${RDF}type`, `${SH}targetClass`, `${SH}name`, `${SH}property`, `${TGS}note`, `${TGS}edgesClosed`, `${TGS}template`, `${TGS}templateBody`, `${TGS}visualization`, `${SH}description`, `${TGS}elements`, `${TGS}sections`, `${TGS}inverseEdge`, `${TGS}abstract`]);
 const PROP_KNOWN = new Set([`${RDF}type`, `${SH}path`, `${SH}name`, `${SH}datatype`, `${SH}nodeKind`, `${SH}class`, `${SH}node`, `${SH}or`, `${SH}minCount`, `${SH}maxCount`, `${SH}defaultValue`, `${SH}in`, `${SH}order`, `${SH}hasValue`, `${TGS}kind`, `${TGS}edge`, `${TGS}default`, `${SH}description`]);
 
 /**
@@ -62,6 +62,7 @@ const PROP_KNOWN = new Set([`${RDF}type`, `${SH}path`, `${SH}name`, `${SH}dataty
 // @tg: implements:: [[openspec:shacl-interop#Reverse mapping]]
 // @tg: implements:: [[openspec:shacl-interop#Typed Graph annotations]]
 // @tg: implements:: [[openspec:document-elements#SHACL exchange of descriptions and elements]]
+// @tg: implements:: [[openspec:shacl-interop#Type inheritance in SHACL]]
 export function importShacl(turtle: string, opts: ShaclImportOptions = {}): ShaclImport {
   const base = opts.base ?? DEFAULT_BASE_IRI;
   const declared: Record<string, string> = {};
@@ -239,6 +240,8 @@ export function importShacl(turtle: string, opts: ShaclImportOptions = {}): Shac
     reportUnknown(s, NODE_KNOWN, name);
     const { props, edges } = readPropertyShapes(s, name, new Set());
     const closed = one(s, `${TGS}edgesClosed`)?.value === 'true';
+    // Supertypes are `rdfs:subClassOf` statements on the target class, named like edge targets.
+    const supers = [...new Set(get(classes[0]!.value, `${RDFS}subClassOf`).filter((c) => c.termType === 'NamedNode').map((c) => typeName(c.value)))];
     types.push({
       type: name,
       properties: props,
@@ -249,6 +252,8 @@ export function importShacl(turtle: string, opts: ShaclImportOptions = {}): Shac
       note: str(one(s, `${TGS}note`)),
       templateBody: str(one(s, `${TGS}templateBody`)),
       ...described(one(s, `${SH}description`)),
+      ...(one(s, `${TGS}abstract`)?.value === 'true' ? { abstract: true } : {}),
+      ...nonEmpty('is', supers),
       ...nonEmpty('elements', readElementDeclarations(json(s, `${TGS}elements`, name) ?? undefined, (m) => drop(name, `tgs:elements (${m})`))),
       ...nonEmpty('sections', readSectionDeclarations(json(s, `${TGS}sections`, name) ?? undefined, (m) => drop(name, `tgs:sections (${m})`))),
     });

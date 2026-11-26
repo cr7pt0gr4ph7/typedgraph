@@ -21,7 +21,7 @@ export interface VaultFinding {
 }
 
 /** Declaration problems and a missing schema folder make the schema unusable; everything else is advisory. */
-const ERROR_CODES = new Set(['invalid-declaration', 'unsupported-version', 'duplicate-declaration', 'inverse-conflict', 'missing-ontology']);
+const ERROR_CODES = new Set(['invalid-declaration', 'unsupported-version', 'duplicate-declaration', 'inverse-conflict', 'missing-ontology', 'unknown-base-type', 'base-not-abstract', 'inheritance-cycle', 'property-conflict', 'abstract-type']);
 
 /** Codes whose line always points into the note body, even line 0. */
 const LINE_CODES = new Set(['edge-syntax', 'embed', 'annotation', 'lat-link', 'ambiguous-link', 'adoc-include', 'adoc-visible-edge', 'too-many-elements', 'missing-attribute', 'attribute-value-not-allowed', 'unclosed-element']);
@@ -94,6 +94,7 @@ export function validateVault(notes: readonly NoteInput[], options: ValidateOpti
     graph.upsertNote(n);
   }
   const schemas = schemasFromGraph(graph, folder);
+  graph.setTypeHierarchy(schemas.supertypes);
   const style = styleSourcesFromSchemas(schemas.schemas, options.iconExists, schemas.edgeTypes).diagnostics;
   return toFindings(vaultDiagnostics({ graph, schemas, style, embeds }));
 }

@@ -1,4 +1,4 @@
-import { findLuhmannParent, isSchemaPath, luhmannRule, luhmannTypes, normalizeFolder, planNewNote, scaffoldSchemaNote, splitFrontmatter, templatePath, type Diagnostic, type LuhmannParent, type TypeSchema } from '@obsigraph/core';
+import { concreteTypes, findLuhmannParent, isSchemaPath, luhmannRule, luhmannTypes, normalizeFolder, planNewNote, scaffoldSchemaNote, splitFrontmatter, templatePath, type Diagnostic, type LuhmannParent, type TypeSchema } from '@obsigraph/core';
 import { exportShacl, importShacl, planImport, type ExistingNote, type ImportPlan, type ShaclImport } from '@obsigraph/core/src/shacl.js';
 import { App, getIcon, Menu, Modal, Notice, normalizePath, Setting, SuggestModal, TFile, TFolder } from 'obsidian';
 import type ObsigraphPlugin from './main';
@@ -316,8 +316,10 @@ function askType(plugin: ObsigraphPlugin, folder?: string): void {
   new TypeSuggestModal(plugin.app, types, (schema) => askTitle(plugin, schema, folder)).open();
 }
 
+/** Types a note can be created as: abstract types are only for inheritance. */
+// @tg: implements:: [[openspec:typed-note-creation#Abstract types are not offered]]
 function typesOf(plugin: ObsigraphPlugin): TypeSchema[] {
-  const types = [...plugin.index.schemas().schemas.values()].sort((a, b) => a.type.localeCompare(b.type));
+  const types = concreteTypes(plugin.index.schemas()).sort((a, b) => a.type.localeCompare(b.type));
   if (types.length === 0) new Notice(`No schema notes found in ${normalizeFolder(plugin.settings.schemaFolder) || 'the schema folder'}.`);
   return types;
 }
@@ -365,12 +367,12 @@ async function createFromType(
   let linked: string | null = null;
   if (schema.template) {
     const resolve = (link: string, from: string) => app.metadataCache.getFirstLinkpathDest(link, from)?.path ?? null;
-    linked = templatePath(schema.template, schema.path, resolve);
+    linked = templatePath(schema.template, schema.templateNote ?? schema.path, resolve);
     linkedBody = await bodyOf(app, linked);
     if (linkedBody === null) new Notice(`Template ${schema.template} for ${schema.type} was not found; using the next template source.`);
   }
   if (opts.luhmann && !luhmannRule(schema)) opts = { ...opts, luhmann: false };
-  const plan = planNewNote({ schema, title, linkedBody, templatePath: linked, schemaBody: (await bodyOf(app, schema.path)) ?? '', graph: plugin.index.graph, parent: opts.parent, luhmann: opts.luhmann });
+  const plan = planNewNote({ schema, title, linkedBody, templatePath: linked, schemaBody: (await bodyOf(app, schema.templateNote ?? schema.path)) ?? '', graph: plugin.index.graph, parent: opts.parent, luhmann: opts.luhmann });
   let dir = opts.folder;
   if (dir === undefined) {
     const parent = app.fileManager.getNewFileParent(app.workspace.getActiveFile()?.path ?? '');

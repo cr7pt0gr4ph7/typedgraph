@@ -150,6 +150,8 @@ export function compactType(t: Omit<ImportedType, 'note' | 'templateBody'>): Rec
   const o: Record<string, unknown> = {};
   if (t.uri) o.uri = t.uri;
   if (t.description) o.description = t.description;
+  if (t.abstract) o.abstract = true;
+  if (t.is?.length) o.is = t.is;
   if (t.properties.length) o.properties = compactProps(t.properties);
   if (t.edges) o.edges = compactEdges(t.edges);
   if (t.sections?.length) o.sections = compactSections(t.sections);

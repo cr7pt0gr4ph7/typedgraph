@@ -1,0 +1,380 @@
+{
+  "invalidAgainstJsonSchema": [],
+  "types": [
+    {
+      "name": "Asset",
+      "note": "Types/Broken.md",
+      "iri": "urn:tgs:Asset",
+      "properties": [
+        {
+          "name": "value",
+          "iri": "urn:tgs:value",
+          "kind": "number",
+          "required": false,
+          "many": false,
+          "values": null,
+          "default": null
+        }
+      ],
+      "edges": null,
+      "template": null,
+      "abstract": true
+    },
+    {
+      "name": "Building",
+      "note": "Types/Broken.md",
+      "iri": "urn:tgs:Building",
+      "properties": [
+        {
+          "name": "value",
+          "iri": "urn:tgs:value",
+          "kind": "date",
+          "required": false,
+          "many": false,
+          "values": null,
+          "default": null
+        }
+      ],
+      "edges": null,
+      "template": null,
+      "is": [
+        "Asset"
+      ],
+      "supertypes": [
+        "Asset"
+      ]
+    },
+    {
+      "name": "Company",
+      "note": "Types/Legal entities.md",
+      "iri": "https://schema.org/Organization",
+      "properties": [
+        {
+          "name": "founded",
+          "iri": "urn:tgs:founded",
+          "kind": "date",
+          "required": false,
+          "many": false,
+          "values": null,
+          "default": null
+        },
+        {
+          "name": "name",
+          "iri": "urn:tgs:name",
+          "kind": "text",
+          "required": true,
+          "many": false,
+          "values": null,
+          "default": null
+        }
+      ],
+      "edges": null,
+      "template": null,
+      "is": [
+        "LegalEntity"
+      ],
+      "supertypes": [
+        "LegalEntity"
+      ]
+    },
+    {
+      "name": "GeneralLegalEntity",
+      "note": "Types/Legal entities.md",
+      "iri": "urn:tgs:GeneralLegalEntity",
+      "properties": [
+        {
+          "name": "name",
+          "iri": "urn:tgs:name",
+          "kind": "text",
+          "required": true,
+          "many": false,
+          "values": null,
+          "default": null
+        }
+      ],
+      "edges": null,
+      "template": null,
+      "is": [
+        "LegalEntity"
+      ],
+      "supertypes": [
+        "LegalEntity"
+      ]
+    },
+    {
+      "name": "LegalEntity",
+      "note": "Types/Legal entities.md",
+      "iri": "urn:tgs:LegalEntity",
+      "properties": [
+        {
+          "name": "name",
+          "iri": "urn:tgs:name",
+          "kind": "text",
+          "required": true,
+          "many": false,
+          "values": null,
+          "default": null
+        }
+      ],
+      "edges": null,
+      "template": null,
+      "description": "Anyone who can own things and sign contracts.",
+      "abstract": true
+    },
+    {
+      "name": "Loop",
+      "note": "Types/Broken.md",
+      "iri": "urn:tgs:Loop",
+      "properties": [],
+      "edges": null,
+      "template": null,
+      "abstract": true,
+      "is": [
+        "Loop2"
+      ],
+      "supertypes": [
+        "Loop2"
+      ]
+    },
+    {
+      "name": "Loop2",
+      "note": "Types/Broken.md",
+      "iri": "urn:tgs:Loop2",
+      "properties": [],
+      "edges": null,
+      "template": null,
+      "abstract": true,
+      "is": [
+        "Loop"
+      ],
+      "supertypes": []
+    },
+    {
+      "name": "Patent",
+      "note": "Types/Legal entities.md",
+      "iri": "urn:tgs:Patent",
+      "properties": [
+        {
+          "name": "id",
+          "iri": "urn:tgs:id",
+          "kind": "text",
+          "required": false,
+          "many": false,
+          "values": null,
+          "default": null
+        }
+      ],
+      "edges": [
+        {
+          "type": "cites",
+          "targets": [
+            "Patent"
+          ],
+          "many": true,
+          "required": false
+        },
+        {
+          "type": "heldBy",
+          "targets": [
+            "LegalEntity"
+          ],
+          "many": true,
+          "required": false
+        }
+      ],
+      "template": null
+    },
+    {
+      "name": "Person",
+      "note": "Types/Legal entities.md",
+      "iri": "urn:tgs:Person",
+      "properties": [
+        {
+          "name": "email",
+          "iri": "urn:tgs:email",
+          "kind": "text",
+          "required": true,
+          "many": false,
+          "values": null,
+          "default": null
+        },
+        {
+          "name": "name",
+          "iri": "urn:tgs:name",
+          "kind": "text",
+          "required": true,
+          "many": false,
+          "values": null,
+          "default": null
+        }
+      ],
+      "edges": [
+        {
+          "type": "worksAt",
+          "targets": [
+            "Company"
+          ],
+          "many": true,
+          "required": false
+        },
+        {
+          "type": "knows",
+          "targets": [
+            "Person"
+          ],
+          "many": true,
+          "required": false
+        },
+        {
+          "type": "owns",
+          "targets": [
+            "Patent"
+          ],
+          "many": true,
+          "required": false
+        }
+      ],
+      "template": null,
+      "is": [
+        "LegalEntity"
+      ],
+      "supertypes": [
+        "LegalEntity"
+      ]
+    },
+    {
+      "name": "Robot",
+      "note": "Types/Broken.md",
+      "iri": "urn:tgs:Robot",
+      "properties": [],
+      "edges": null,
+      "template": null,
+      "is": [
+        "Person",
+        "Machine"
+      ],
+      "supertypes": []
+    },
+    {
+      "name": "Valued",
+      "note": "Types/Broken.md",
+      "iri": "urn:tgs:Valued",
+      "properties": [
+        {
+          "name": "value",
+          "iri": "urn:tgs:value",
+          "kind": "text",
+          "required": false,
+          "many": false,
+          "values": null,
+          "default": null
+        }
+      ],
+      "edges": null,
+      "template": null,
+      "abstract": true
+    },
+    {
+      "name": "Vehicle",
+      "note": "Types/Broken.md",
+      "iri": "urn:tgs:Vehicle",
+      "properties": [
+        {
+          "name": "value",
+          "iri": "urn:tgs:value",
+          "kind": "number",
+          "required": false,
+          "many": false,
+          "values": null,
+          "default": null
+        }
+      ],
+      "edges": null,
+      "template": null,
+      "is": [
+        "Asset",
+        "Valued"
+      ],
+      "supertypes": [
+        "Asset",
+        "Valued"
+      ]
+    }
+  ],
+  "edgeTypes": [
+    {
+      "name": "owns",
+      "note": "Types/Legal entities.md",
+      "iri": "urn:tgs:owns",
+      "from": [
+        "LegalEntity"
+      ],
+      "to": [
+        "Patent"
+      ],
+      "properties": [
+        {
+          "name": "since",
+          "iri": "urn:tgs:since",
+          "kind": "date",
+          "required": false,
+          "many": false,
+          "values": null,
+          "default": null
+        }
+      ]
+    }
+  ],
+  "diagnostics": [
+    {
+      "path": "Acme.md",
+      "line": null,
+      "diagnostic": "missing-property"
+    },
+    {
+      "path": "P1.md",
+      "line": 6,
+      "diagnostic": "wrong-target-type"
+    },
+    {
+      "path": "P1.md",
+      "line": 7,
+      "diagnostic": "edge-not-allowed"
+    },
+    {
+      "path": "P1.md",
+      "line": 7,
+      "diagnostic": "wrong-source-type"
+    },
+    {
+      "path": "Somebody.md",
+      "line": null,
+      "diagnostic": "abstract-type"
+    },
+    {
+      "path": "Types/Broken.md",
+      "line": null,
+      "diagnostic": "base-not-abstract"
+    },
+    {
+      "path": "Types/Broken.md",
+      "line": null,
+      "diagnostic": "inheritance-cycle"
+    },
+    {
+      "path": "Types/Broken.md",
+      "line": null,
+      "diagnostic": "property-conflict"
+    },
+    {
+      "path": "Types/Broken.md",
+      "line": null,
+      "diagnostic": "property-conflict"
+    },
+    {
+      "path": "Types/Broken.md",
+      "line": null,
+      "diagnostic": "unknown-base-type"
+    }
+  ]
+}

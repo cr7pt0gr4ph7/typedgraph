@@ -210,5 +210,7 @@ export function buildLatGraph(index: LatIndex, options: LatGraphOptions = {}): {
   for (const n of code.nodes) upsertCodeNode(graph, n);
   // Notes last, so their includes and links end at the code and section nodes already there.
   for (const n of parsedNotes) graph.upsertNote({ path: n.path, text: n.text, frontmatter: n.parsed.meta });
+  // A section of a `Person` file also matches `(:LegalEntity)` when the ontology says `Person is LegalEntity`.
+  if (options.schemas) graph.setTypeHierarchy(options.schemas.supertypes);
   return { graph, code };
 }

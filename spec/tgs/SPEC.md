@@ -12,7 +12,7 @@
 | **Source** | `spec/tgs/` in [github.com/Volland/typedgraph](https://github.com/Volland/typedgraph) |
 | **License** | Text: CC BY 4.0. JSON Schema and examples: MIT. |
 
-TGS describes the types of a knowledge graph kept as markdown or AsciiDoc notes: what properties a note of a type has, which typed links it may have to which other types, what properties those links carry, which links are the same relation read from its other end, and what the parts inside a note mean: its headings and the XML elements it contains. Every declaration can explain itself in a `description`, written for people and for AI agents alike. A schema is ordinary YAML frontmatter in ordinary notes, so people can write and review it by hand, and it maps to and from W3C SHACL so the same ontology can be exchanged with RDF tools.
+TGS describes the types of a knowledge graph kept as markdown or AsciiDoc notes: what properties a note of a type has, which types it is a kind of, which typed links it may have to which other types, what properties those links carry, which links are the same relation read from its other end, and what the parts inside a note mean: its headings and the XML elements it contains. Every declaration can explain itself in a `description`, written for people and for AI agents alike. A schema is ordinary YAML frontmatter in ordinary notes, so people can write and review it by hand, and it maps to and from W3C SHACL so the same ontology can be exchanged with RDF tools.
 
 TGS is independent of any one application. Typed Graph (an Obsidian plugin and CLI) is the reference implementation.
 
@@ -30,7 +30,7 @@ The key words MUST, MUST NOT, SHOULD, SHOULD NOT and MAY are to be read as descr
 
 TGS types a labelled property graph built from notes:
 
-- Each note is a **node**. Its **labels** are the type names in its frontmatter `type` (a string or a list of strings), followed by those in `types`, without duplicates. Its **properties** are its frontmatter keys.
+- Each note is a **node**. Its **written labels** are the type names in its frontmatter `type` (a string or a list of strings), followed by those in `types`, without duplicates. Its **labels** are its written labels followed by every supertype of each (section 4.10), without duplicates. Its **properties** are its frontmatter keys.
 - An **edge** has a source note, a target note, an **edge type** (a name) and properties (a mapping of scalars or lists). How edges are written in markdown is up to the host. In the reference implementation an edge is one line, `worksAt:: [[Acme]] {since: 2020}`.
 - A link to a note that does not exist creates a **stub** node with no labels.
 
@@ -145,6 +145,8 @@ A type declaration is a mapping with these optional keys:
 | `description` | string | what the type means (section 4.1) (0.4) |
 | `elements` | sections 4.2 to 4.4 | XML elements a note of this type may contain (0.4) |
 | `sections` | section 4.5 | headings a note of this type has (0.4) |
+| `is` | type name or list | abstract supertypes this type inherits from (section 4.10) (0.7) |
+| `abstract` | boolean | `true`: the type is only for inheritance (section 4.10) (0.7) |
 
 An empty mapping (`{}`) or a null value declares a type with no constraints.
 
@@ -159,7 +161,7 @@ A note of a type has parts: headings (section 4.5) and **elements**, block-level
 ```yaml
 # Types/Decision.md
 ---
-tgs: "0.6"
+tgs: "0.7"
 schema:
   description: A choice that was made, with its reason and the alternatives rejected.
   sections:
@@ -243,7 +245,7 @@ Elements nest. A declaration says where a tag *means* something, not where it ma
 ```yaml
 # Types/Runbook.md
 ---
-tgs: "0.6"
+tgs: "0.7"
 schema:
   description: How to operate one part of the system when something goes wrong.
   elements:
@@ -326,6 +328,66 @@ A list of `elements` or `sections` holds names only; a list of attributes follow
           <check>  (required) — How to tell that the step worked.
       <rollback>  (exactly one) — How to undo the steps.
 ```
+
+### 4.10 Inheritance
+
+A type MAY say that it is a kind of other types with `is`, a type name or a list of type names, its **direct supertypes**. A supertype MUST be declared with `abstract: true`. An **abstract** type is a family of types: it exists to be inherited from and to be named in queries, edge rules and edge types, and no note may have it as a written label. A concrete type that stands for the family as a whole is declared as one more subtype:
+
+```yaml
+# Types/Legal entities.md
+---
+tgs: "0.7"
+schemas:
+  LegalEntity:
+    abstract: true
+    description: Anyone who can own things and sign contracts.
+    properties:
+      name: text
+  Person:
+    is: [LegalEntity]
+    properties:
+      email: {kind: text, required: true}
+    edges: {worksAt: Company, knows: Person}
+  Company:
+    is: LegalEntity
+    uri: schema:Organization
+    properties:
+      founded: date
+  GeneralLegalEntity:
+    is: LegalEntity
+  Patent:
+    properties:
+      id: text
+edgeTypes:
+  owns:
+    from: LegalEntity
+    to: Patent
+    properties:
+      since: date
+---
+```
+
+The **supertypes** of a type are its direct supertypes, each followed by its own supertypes, in `is` order and without duplicates; `Person` above has the supertype `LegalEntity`. Abstract types MAY themselves declare `is`.
+
+A reader MUST give each type an **effective declaration** that adds what it inherits from its direct supertypes, each taken with what it inherits in turn, in `is` order:
+
+- `properties`: the type's own, then each supertype's that the type does not declare. A property inherited from two supertypes is taken from the first. A property of the same name with another `kind` is a `property-conflict`, whether the type redeclares it or two supertypes declare it; the type's own or the first one wins. A type MAY redeclare an inherited property with the same kind, for example to make it required.
+- `edges`, `elements` and `sections`: merged as the effective schema of a node with the type and its direct supertypes as labels, in that order (section 9).
+- `visualization`: attribute by attribute, the type's own first.
+- `template` and `id`: the type's own, else those of the first supertype that has them. A type declared with `schema:` has its own template, its note body. An inherited `template` link is resolved from the note that declares it, and an inherited template body is that note's body.
+- `uri` and `description` are never inherited.
+
+A reader MUST report these as declaration diagnostics and MUST ignore the supertype they name:
+
+| Diagnostic | Reported when |
+|---|---|
+| `unknown-base-type` | `is` names a type that is not declared |
+| `base-not-abstract` | `is` names a type that is not `abstract` |
+| `inheritance-cycle` | `is` names the type itself, or a type that inherits from it |
+
+Because a node's labels include the supertypes of its written labels (section 2), everything that matches labels matches a family: a query for `LegalEntity` finds the notes of `Person`, `Company` and `GeneralLegalEntity`; the edge type `owns` accepts any of them as its source; and an edge rule whose target is `LegalEntity` accepts any of them as its target. A host that exposes labels (for example to a query language) SHOULD expose these labels, and MAY also offer the written labels.
+
+Hosts SHOULD NOT offer an abstract type when they let people create a note of a type.
 
 ## 5. Properties and edges
 
@@ -480,7 +542,7 @@ Validation is advisory. A validator MUST report diagnostics and MUST NOT remove 
 
 When edge types declare inverses (section 6.1), a validator MUST check endpoints, edge properties, `missing-edge` and `too-many-edges` on the canonical edges. A node's `required` and `many` rules count the canonical edges by the name they have at that node, so an edge written from the other end satisfies a required edge. A type's rule for an inverse name constrains the declared source, read from the target's type. `edge-not-allowed` MUST be checked on the edges as written, because it governs what a note may write.
 
-For a node with labels L1, L2, …, the **effective schema** merges the schemas of its labels in order: the first declaration of a property wins; `elements` and `sections` are unioned by tag and by heading, and the first label that declares a tag or heading gives its whole declaration; edge rules are unioned per edge type, with targets unioned (any target if one rule allows any), `many` if any rule allows many and `required` if any rule requires it; `edges` is unrestricted only if no label declares it.
+For a node with labels L1, L2, …, the **effective schema** merges the effective declarations (section 4.10) of its labels in order: the first declaration of a property wins; `elements` and `sections` are unioned by tag and by heading, and the first label that declares a tag or heading gives its whole declaration; edge rules are unioned per edge type, with targets unioned (any target if one rule allows any), `many` if any rule allows many and `required` if any rule requires it; `edges` is unrestricted only if no label declares it.
 
 | Diagnostic | Reported when |
 |---|---|
@@ -504,12 +566,15 @@ For a node with labels L1, L2, …, the **effective schema** merges the schemas 
 | `inverse-duplicate` | an inverse name is declared as an edge type that repeats it (section 6.1; 0.7) |
 | `inverse-mismatch` | the two written ends of one edge differ in a property other than `id`, or one end asserts an edge the other denies (section 6.1; 0.7); reported at the second end |
 | `missing-inverse` | an edge of an inverse or symmetric type is written at one end only (section 6.1; 0.7); SHOULD |
+| `unknown-base-type`, `base-not-abstract`, `inheritance-cycle` | section 4.10 (0.7) |
+| `property-conflict` | section 4.10 (0.7) |
+| `abstract-type` | a written label of a note is an abstract type (0.7) |
 
 Readers SHOULD report each diagnostic with the note path and, for edges, the line of the edge. Message text is not specified.
 
 ## 10. Multiple labels
 
-A note with `type: [Person, Employee]` is checked against the merged schema of section 9. The style of a node is taken attribute by attribute from the first label that supplies it.
+A note with `type: [Person, Employee]` is checked against the merged schema of section 9. Its labels are its written labels followed by their supertypes (section 4.10), so a note of a subtype is also checked against what it inherits. The style of a node is taken attribute by attribute from the first label that supplies it.
 
 ## 11. Visualization (informative)
 
@@ -523,7 +588,7 @@ A schema note MAY declare `tgs: "<major>.<minor>"`. A reader implementing versio
 - MUST report a note that declares another major version as `unsupported-version` and MUST NOT use its declarations;
 - MUST read notes without `tgs` as version 0.1.
 
-TGS 0.2 adds the `id` key (section 8.1) and the template tokens. TGS 0.3 adds AsciiDoc notes (section 2.1) and adds no schema key. TGS 0.4 adds `description` (section 4.1), `elements` and `sections` (sections 4.2 to 4.5) and document validation (section 4.8); unknown keys inside an element declaration are reported like those of a type. TGS 0.5 adds no key. It fixes how elements are declared and read: the attribute keys that have a meaning and the reserved `id` (section 4.3), the scope of nested declarations and counting per container (section 4.4), and one normal form for every shorthand (section 4.9). TGS 0.6 adds no key and changes no rule. It moves the identifiers of the specification to `https://typedgraph.org/`: the address of each version, the JSON Schema `$id`, and the `tgs:` namespace, which was `https://volland.github.io/obsigraph/ns/tgs#` in versions 0.1 to 0.5 (section 13.4). TGS 0.7 adds `inverseEdge` to edge type declarations: inverse and symmetric edge types, canonical edges, the `inverse-conflict`, `inverse-duplicate`, `inverse-mismatch` and `missing-inverse` diagnostics (section 6.1) and the `tgs:inverseEdge` annotation (section 13.4). Every 0.1 note is a valid 0.2 note, every 0.2 note is a valid 0.3 note, every 0.3 note is a valid 0.4 note, every 0.4 note is a valid 0.5 note, every 0.5 note is a valid 0.6 note, and every 0.6 note is a valid 0.7 note.
+TGS 0.2 adds the `id` key (section 8.1) and the template tokens. TGS 0.3 adds AsciiDoc notes (section 2.1) and adds no schema key. TGS 0.4 adds `description` (section 4.1), `elements` and `sections` (sections 4.2 to 4.5) and document validation (section 4.8); unknown keys inside an element declaration are reported like those of a type. TGS 0.5 adds no key. It fixes how elements are declared and read: the attribute keys that have a meaning and the reserved `id` (section 4.3), the scope of nested declarations and counting per container (section 4.4), and one normal form for every shorthand (section 4.9). TGS 0.6 adds no key and changes no rule. It moves the identifiers of the specification to `https://typedgraph.org/`: the address of each version, the JSON Schema `$id`, and the `tgs:` namespace, which was `https://volland.github.io/obsigraph/ns/tgs#` in versions 0.1 to 0.5 (section 13.5). TGS 0.7 adds `inverseEdge` to edge type declarations: inverse and symmetric edge types, canonical edges, the `inverse-conflict`, `inverse-duplicate`, `inverse-mismatch` and `missing-inverse` diagnostics (section 6.1) and the `tgs:inverseEdge` annotation (section 13.5). TGS 0.7 adds `is` and `abstract` (section 4.10): a node's labels include the supertypes of its written labels, and the diagnostics `unknown-base-type`, `base-not-abstract`, `inheritance-cycle`, `property-conflict` and `abstract-type`. Every 0.1 note is a valid 0.2 note, every 0.2 note is a valid 0.3 note, every 0.3 note is a valid 0.4 note, every 0.4 note is a valid 0.5 note, every 0.5 note is a valid 0.6 note, and every 0.6 note is a valid 0.7 note.
 
 Minor versions only add optional keys. A published version never changes.
 
@@ -583,7 +648,11 @@ Each edge type becomes a `sh:NodeShape` named base IRI + name + `EdgeShape` that
 
 An edge type's `description` is the `sh:description` of its edge shape. The `rdf:predicate` constraint identifies the edge type; `rdf:subject` carries `from` and `rdf:object` carries `to` (with `sh:or` for several types); the remaining property shapes are the edge's properties. The shape declares no target, so validators apply it to reified statements on request. This uses only SHACL 1.0 and the RDF reification vocabulary; a later TGS version may add RDF 1.2 reifiers.
 
-### 13.4 Annotations
+### 13.4 Inheritance
+
+A node shape lists only the type's own declarations, not what it inherits (section 4.10). Each direct supertype becomes a statement on the type's class, `<type IRI> rdfs:subClassOf <supertype IRI>`, in `is` order, written after the type's node shape. SHACL targets the instances of a subclass with the shapes of its superclasses, so a SHACL engine checks inherited properties without further annotation, and `sh:class` matches instances of subclasses. An abstract type has `tgs:abstract true` on its node shape.
+
+### 13.5 Annotations
 
 What SHACL cannot express is kept as annotations in the namespace `https://typedgraph.org/ns/tgs#`, which SHACL engines ignore. Exporters MUST write that namespace. Versions 0.1 to 0.5 named it `https://volland.github.io/obsigraph/ns/tgs#`, an address that no longer resolves; importers MUST read a term in that former namespace as the same term in the current one, so exports made under earlier versions import unchanged.
 
@@ -600,8 +669,9 @@ What SHACL cannot express is kept as annotations in the namespace `https://typed
 | `tgs:elements` | node shape | the type's `elements` as a JSON literal in the compact form of section 4.9 (0.4) |
 | `tgs:sections` | node shape | the type's `sections` as a JSON literal (0.4) |
 | `tgs:inverseEdge` | edge shape | the edge type's `inverseEdge` name as a string (0.7) |
+| `tgs:abstract` | node shape | `true` for an abstract type (0.7) |
 
-### 13.5 Import
+### 13.6 Import
 
 An importer MUST read:
 
@@ -609,16 +679,17 @@ An importer MUST read:
 - a property shape with `sh:datatype` (mapped back per section 5.2; integer, double and similar numeric types are `number`) or `sh:nodeKind sh:IRI` as a property;
 - a property shape with `sh:class`, `sh:node` (a shape with a target class), an `sh:or` of single `sh:class` alternatives, or `tgs:edge true`, as an edge of the type; its name is `sh:name`, else the name of the edge type with that predicate, else the local name of the path;
 - a node shape whose property shape on `rdf:predicate` has `sh:hasValue` as an edge type, named by `sh:name`, else by the local name of the predicate;
-- `sh:minCount` ≥ 1 as `required`, the absence of `sh:maxCount 1` as `many`, and the annotations of 13.4, in the current or the former namespace;
+- an `rdfs:subClassOf` statement whose subject and object are the target classes of two node shapes as `is`, in statement order, and `tgs:abstract true` as `abstract`;
+- `sh:minCount` ≥ 1 as `required`, the absence of `sh:maxCount 1` as `many`, and the annotations of 13.5, in the current or the former namespace;
 - a `uri` whenever an IRI differs from the base IRI + name, written as a CURIE when a prefix matches.
 
 An importer MUST report, and otherwise skip, every construct outside this subset, including `sh:closed`, `sh:pattern`, `sh:minLength`, `sh:qualifiedValueShape`, `sh:sparql`, `sh:and`, `sh:xone`, `sh:not`, property paths other than a single IRI, unknown datatypes (read as `text`), `sh:maxCount` greater than 1 (read as many) and node shapes without a target class. It MUST import the rest of each shape.
 
 An importer that writes notes SHOULD write one note per type by default (or group types by `tgs:note`), MUST replace only the `schema`, `schemas`, `edgeTypes` and `prefixes` keys of an existing note, MUST NOT delete notes, and SHOULD refuse to rewrite a note that declares types missing from the import unless the user asks. A note that declares several types has no template body, so an importer that groups types into one note SHOULD report each `tgs:templateBody` it cannot keep.
 
-### 13.6 Round trip
+### 13.7 Round trip
 
-For schemas written in TGS, export followed by import MUST reproduce the same types, edge types, properties, edges, identifiers, templates, visualization, descriptions, elements, sections and inverse names. Exporting the result again yields the same RDF graph; the reference implementation produces byte-identical Turtle.
+For schemas written in TGS, export followed by import MUST reproduce the same types, edge types, properties, edges, identifiers, templates, visualization, descriptions, elements, sections, inverse names, supertypes and abstract flags. Exporting the result again yields the same RDF graph; the reference implementation produces byte-identical Turtle.
 
 ## 14. Conformance
 

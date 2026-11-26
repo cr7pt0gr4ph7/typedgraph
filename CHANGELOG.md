@@ -47,6 +47,26 @@ One schema folder for every command, the CLI's config and the Obsidian plugin.
 
 - **An unquoted `[[link]]` in an edge property is a link.** `met_with:: [[Person A]] {location: [[Location B]]}` now gives `location` the string `"[[Location B]]"`, as if it were quoted and as Obsidian highlights it. Before, it was the nested list `[["Location B"]]`. A value counts as a link when it is `[[`, then no bracket or line break, then `]]`. To write a nested list holding one item, use `[[X],]` or `[ [X] ]`. `[[1, 2], [3]]` is still a list of lists.
 
+Types can inherit from abstract types (TGS 0.7, Volland/typedgraph#21).
+
+### Added
+
+- **`is` and `abstract` in schema notes (TGS 0.7).** `Person: {is: [LegalEntity]}` inherits `LegalEntity`'s properties, edges, elements and sections. It also inherits the template, look and ids when it has none of its own. `LegalEntity: {abstract: true}` marks a type that exists only to be inherited from. Every supertype must be abstract. For a concrete member of the whole family, declare one more subtype such as `GeneralLegalEntity`.
+- **Queries and edges on a base type reach the subtypes.** A note's labels now include the supertypes of its types. So `MATCH (a:LegalEntity)` finds people and companies, and `owns: {from: LegalEntity}` or an edge rule `heldBy: LegalEntity` accepts either. This holds in the plugin, the sidecar's Ladybug mirror, `tg graph` and `tg ontology check`. `labels(n)` lists the supertypes too.
+- **New errors.**
+  - `unknown-base-type`, `base-not-abstract` and `inheritance-cycle` for a supertype that cannot be used. It is ignored.
+  - `property-conflict` when a property is inherited, or redeclared, with another kind.
+  - `abstract-type` for a note written with an abstract type. `tg ontology check` reports a lat.md file typed with one.
+- **SHACL.** A node shape now lists only the type's own declarations, plus `rdfs:subClassOf` for each supertype and `tgs:abstract true`. A SHACL engine then checks inherited properties too, and the import reads both back.
+- **`tg ontology`** shows `abstract` and `is` on each type and marks where each inherited property comes from. `--json` adds `abstract`, `is`, `supertypes` and `inheritedFrom`.
+- **Gallery.** The zettelkasten's books, articles and papers share an abstract `ReadingSource`. The OKF catalog types share `CatalogEntry`.
+
+### Changed
+
+- **TGS 0.7 is the current specification**, with section 4.10 Inheritance and conformance example `09-type-inheritance`. 0.6 is archived unchanged, and every 0.6 note is a valid 0.7 note.
+- **Pickers skip abstract types.** *New typed note* (Obsidian and VS Code) and the Luhmann commands do not offer abstract types.
+- **For library users:** `SchemaSet.schemas` now holds each type's effective declaration. `SchemaSet.declared` keeps the types as written, and `SchemaSet.supertypes` lists each type's supertypes. `Graph.setTypeHierarchy` applies a hierarchy, and `Graph.writtenLabels` returns a note's labels without supertypes.
+
 ## 0.31.0 — 2026-11-24
 
 OpenFlow joins the spec frameworks `tg` traces.
