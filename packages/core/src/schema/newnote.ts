@@ -33,7 +33,7 @@ export function luhmannRule(schema: TypeSchema): IdRule | null {
 
 /** Types that have a Luhmann id rule, by name. */
 export function luhmannTypes(set: SchemaSet): TypeSchema[] {
-  return [...set.schemas.values()].filter((s) => luhmannRule(s)).sort((a, b) => a.type.localeCompare(b.type));
+  return [...set.schemas.values()].filter((s) => !s.abstract && luhmannRule(s)).sort((a, b) => a.type.localeCompare(b.type));
 }
 
 /**
@@ -46,6 +46,7 @@ export function findLuhmannParent(graph: Graph, set: SchemaSet, path: string): L
   if (!node || node.stub) return null;
   for (const label of node.labels) {
     const schema = set.schemas.get(label);
+    if (schema?.abstract) continue;
     const rule = schema && luhmannRule(schema);
     const raw = rule ? node.props[rule.property] : undefined;
     if (schema && rule && (typeof raw === 'string' || typeof raw === 'number')) {

@@ -1,0 +1,222 @@
+# Typed Graph Schema (TGS 0.7) exported as SHACL
+@prefix : <urn:tgs:> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix schema: <https://schema.org/> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix tgs: <https://typedgraph.org/ns/tgs#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+:AssetShape
+    a sh:NodeShape ;
+    sh:targetClass :Asset ;
+    sh:name "Asset" ;
+    tgs:note "Types/Broken.md" ;
+    tgs:abstract true ;
+    sh:property [
+        sh:path :value ;
+        sh:name "value" ;
+        sh:datatype xsd:decimal ;
+        sh:maxCount 1 ;
+        sh:order 0
+    ] .
+
+:BuildingShape
+    a sh:NodeShape ;
+    sh:targetClass :Building ;
+    sh:name "Building" ;
+    tgs:note "Types/Broken.md" ;
+    sh:property [
+        sh:path :value ;
+        sh:name "value" ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:order 0
+    ] .
+
+:Building
+    rdfs:subClassOf :Asset .
+
+:CompanyShape
+    a sh:NodeShape ;
+    sh:targetClass schema:Organization ;
+    sh:name "Company" ;
+    tgs:note "Types/Legal entities.md" ;
+    sh:property [
+        sh:path :founded ;
+        sh:name "founded" ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:order 0
+    ] .
+
+schema:Organization
+    rdfs:subClassOf :LegalEntity .
+
+:GeneralLegalEntityShape
+    a sh:NodeShape ;
+    sh:targetClass :GeneralLegalEntity ;
+    sh:name "GeneralLegalEntity" ;
+    tgs:note "Types/Legal entities.md" .
+
+:GeneralLegalEntity
+    rdfs:subClassOf :LegalEntity .
+
+:LegalEntityShape
+    a sh:NodeShape ;
+    sh:targetClass :LegalEntity ;
+    sh:name "LegalEntity" ;
+    tgs:note "Types/Legal entities.md" ;
+    sh:description "Anyone who can own things and sign contracts." ;
+    tgs:abstract true ;
+    tgs:visualization "{\"color\":\"#3b82f6\"}" ;
+    sh:property [
+        sh:path :name ;
+        sh:name "name" ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:order 0
+    ] .
+
+:LoopShape
+    a sh:NodeShape ;
+    sh:targetClass :Loop ;
+    sh:name "Loop" ;
+    tgs:note "Types/Broken.md" ;
+    tgs:abstract true .
+
+:Loop
+    rdfs:subClassOf :Loop2 .
+
+:Loop2Shape
+    a sh:NodeShape ;
+    sh:targetClass :Loop2 ;
+    sh:name "Loop2" ;
+    tgs:note "Types/Broken.md" ;
+    tgs:abstract true .
+
+:Loop2
+    rdfs:subClassOf :Loop .
+
+:PatentShape
+    a sh:NodeShape ;
+    sh:targetClass :Patent ;
+    sh:name "Patent" ;
+    tgs:note "Types/Legal entities.md" ;
+    tgs:edgesClosed true ;
+    sh:property [
+        sh:path :id ;
+        sh:name "id" ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:order 0
+    ] ;
+    sh:property [
+        sh:path :cites ;
+        sh:name "cites" ;
+        sh:class :Patent ;
+        sh:order 1
+    ] ;
+    sh:property [
+        sh:path :heldBy ;
+        sh:name "heldBy" ;
+        sh:class :LegalEntity ;
+        sh:order 2
+    ] .
+
+:PersonShape
+    a sh:NodeShape ;
+    sh:targetClass :Person ;
+    sh:name "Person" ;
+    tgs:note "Types/Legal entities.md" ;
+    tgs:edgesClosed true ;
+    tgs:visualization "{\"shape\":\"ellipse\"}" ;
+    sh:property [
+        sh:path :email ;
+        sh:name "email" ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+        sh:order 0
+    ] ;
+    sh:property [
+        sh:path :worksAt ;
+        sh:name "worksAt" ;
+        sh:class schema:Organization ;
+        sh:order 1
+    ] ;
+    sh:property [
+        sh:path :knows ;
+        sh:name "knows" ;
+        sh:class :Person ;
+        sh:order 2
+    ] ;
+    sh:property [
+        sh:path :owns ;
+        sh:name "owns" ;
+        sh:class :Patent ;
+        sh:order 3
+    ] .
+
+:Person
+    rdfs:subClassOf :LegalEntity .
+
+:RobotShape
+    a sh:NodeShape ;
+    sh:targetClass :Robot ;
+    sh:name "Robot" ;
+    tgs:note "Types/Broken.md" .
+
+:Robot
+    rdfs:subClassOf :Person ;
+    rdfs:subClassOf :Machine .
+
+:ValuedShape
+    a sh:NodeShape ;
+    sh:targetClass :Valued ;
+    sh:name "Valued" ;
+    tgs:note "Types/Broken.md" ;
+    tgs:abstract true ;
+    sh:property [
+        sh:path :value ;
+        sh:name "value" ;
+        sh:datatype xsd:string ;
+        sh:maxCount 1 ;
+        sh:order 0
+    ] .
+
+:VehicleShape
+    a sh:NodeShape ;
+    sh:targetClass :Vehicle ;
+    sh:name "Vehicle" ;
+    tgs:note "Types/Broken.md" .
+
+:Vehicle
+    rdfs:subClassOf :Asset ;
+    rdfs:subClassOf :Valued .
+
+:ownsEdgeShape
+    a sh:NodeShape ;
+    sh:name "owns" ;
+    tgs:note "Types/Legal entities.md" ;
+    sh:property [
+        sh:path rdf:predicate ;
+        sh:hasValue :owns
+    ] ;
+    sh:property [
+        sh:path rdf:subject ;
+        sh:class :LegalEntity
+    ] ;
+    sh:property [
+        sh:path rdf:object ;
+        sh:class :Patent
+    ] ;
+    sh:property [
+        sh:path :since ;
+        sh:name "since" ;
+        sh:datatype xsd:date ;
+        sh:maxCount 1 ;
+        sh:order 0
+    ] .

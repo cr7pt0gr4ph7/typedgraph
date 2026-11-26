@@ -1,5 +1,5 @@
 ---
-tgs: "0.2"
+tgs: "0.7"
 schemas:
   FleetingNote:
     id: {kind: uuid7, property: uid}
@@ -18,7 +18,7 @@ schemas:
     properties:
       created: date
     edges:
-      cites: {target: [BookSource, ArticleSource, PaperSource], required: true}
+      cites: {target: ReadingSource, required: true}
       based_on: Highlight
       about: Topic
     visualization: {color: "#38bdf8", shape: round-rectangle, icon: book-marked}
@@ -33,7 +33,7 @@ schemas:
       luhmann: text
     edges:
       derived_from: [FleetingNote, LiteratureNote, Highlight]
-      cites: [BookSource, ArticleSource, PaperSource]
+      cites: ReadingSource
       about: Topic
       extends: PermanentNote
       supports: PermanentNote
@@ -65,43 +65,40 @@ schemas:
       draws_on: [PermanentNote, LiteratureNote, StructureNote]
       about: Topic
     visualization: {color: "#22c55e", shape: diamond, icon: folder-kanban}
-  BookSource:
+  ReadingSource:
+    abstract: true
+    description: Something you read and take notes from. Write a note as one of its kinds, BookSource, ArticleSource or PaperSource; edges and queries on ReadingSource reach all three.
     id: {kind: uuid7, property: uid}
     properties:
       year: number
+      status: {values: [to-read, reading, finished], default: to-read}
+    edges:
+      authored_by: {target: Writer, required: true}
+      about: Topic
+    visualization: {shape: rectangle}
+  BookSource:
+    is: ReadingSource
+    properties:
       publisher: text
       edition: text
       pages: number
-      status: {values: [to-read, reading, finished], default: to-read}
-    edges:
-      authored_by: {target: Writer, required: true}
-      about: Topic
-    visualization: {color: "#64748b", shape: rectangle, icon: book-open}
+    visualization: {color: "#64748b", icon: book-open}
   ArticleSource:
-    id: {kind: uuid7, property: uid}
+    is: ReadingSource
     properties:
-      year: number
       publication: text
       url: link
-      status: {values: [to-read, reading, finished], default: to-read}
-    edges:
-      authored_by: {target: Writer, required: true}
-      about: Topic
-    visualization: {color: "#94a3b8", shape: rectangle, icon: file-text}
+    visualization: {color: "#94a3b8", icon: file-text}
   PaperSource:
-    id: {kind: uuid7, property: uid}
+    is: ReadingSource
     properties:
-      year: number
       kind: {values: [journal, conference, preprint, thesis, report]}
       venue: text
       doi: text
       url: link
-      status: {values: [to-read, reading, finished], default: to-read}
     edges:
-      authored_by: {target: Writer, required: true}
-      cites: [BookSource, ArticleSource, PaperSource]
-      about: Topic
-    visualization: {color: "#0ea5e9", shape: rectangle, icon: graduation-cap}
+      cites: ReadingSource
+    visualization: {color: "#0ea5e9", icon: graduation-cap}
   Highlight:
     id: {kind: uuid7, property: uid}
     template: "[[Templates/Highlight]]"
@@ -110,7 +107,7 @@ schemas:
       color: {values: [yellow, blue, green, red]}
       saved: date
     edges:
-      highlighted_in: {target: [BookSource, ArticleSource, PaperSource], required: true}
+      highlighted_in: {target: ReadingSource, required: true}
       about: Topic
     visualization: {color: "#facc15", shape: rectangle, icon: highlighter}
   Writer:
@@ -140,8 +137,8 @@ edgeTypes:
   processed_into: {from: FleetingNote, to: [LiteratureNote, PermanentNote]}
   indexes: {from: StructureNote, to: [PermanentNote, StructureNote], properties: {order: number}}
   draws_on: {from: ProjectNote, to: [PermanentNote, LiteratureNote, StructureNote], properties: {chapter: text}}
-  authored_by: {from: [BookSource, ArticleSource, PaperSource], to: Writer, properties: {role: {values: [author, editor, translator]}}}
-  highlighted_in: {from: Highlight, to: [BookSource, ArticleSource, PaperSource]}
+  authored_by: {from: ReadingSource, to: Writer, properties: {role: {values: [author, editor, translator]}}}
+  highlighted_in: {from: Highlight, to: ReadingSource}
   about: {to: Topic}
   related_to: {from: Topic, to: Topic}
 ---
@@ -152,6 +149,8 @@ The note type is the stage. A `FleetingNote` is a quick capture that you process
 Every type gets a time-ordered `uid` when a note is created from it, and permanent notes can also take a Luhmann id (`1`, `1a`, `1a1`, `2`) through the child and sibling commands, so the slip box can branch the way Luhmann's did. The templates in `Templates/` fill in the title, date, ids and a link to the parent note.
 
 A `Highlight` is raw text from a source and cites it with `highlighted_in`; a literature note says what it means with `based_on`.
+
+Books, articles and papers are the three kinds of `ReadingSource`, an abstract type (TGS 0.7) that declares what they share once: the `uid`, `year`, reading `status`, a required `authored_by` writer and `about`. No note is a `ReadingSource` itself; it is the name edges and queries use for all three, so `MATCH (s:ReadingSource {status: "reading"})` lists everything on the nightstand.
 
 A `PaperSource` is a research paper with a `venue`, a `doi` and a `kind` (journal, conference, preprint, thesis or report). It is a source like a book or an article, so literature notes, permanent notes and highlights can point at it, and it can also `cites` the books, articles and papers in its own bibliography, so the citation graph of what you read sits next to your notes.
 

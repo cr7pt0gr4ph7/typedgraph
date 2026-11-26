@@ -1,14 +1,15 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { findLuhmannParent, planNewNote, schemasFromGraph, splitFrontmatter, templatePath, type LuhmannParent, type NewNotePlan, type TypeSchema } from '@obsigraph/core';
+import { concreteTypes, findLuhmannParent, planNewNote, schemasFromGraph, splitFrontmatter, templatePath, type LuhmannParent, type NewNotePlan, type TypeSchema } from '@obsigraph/core';
 import type { WorkspaceIndex } from './workspace-index';
 
 /** Characters that cannot be part of a note title (they break file names and links). */
 export const BAD_TITLE = /[\\/:*?"<>|#^[\]]/;
 
-/** The types declared in the schema folder, by name. */
+/** The types a note can be created as, by name: every declared type except abstract ones. */
+// @tg: implements:: [[openspec:typed-note-creation#Abstract types are not offered]]
 export function typesIn(index: WorkspaceIndex, schemaFolder: string): TypeSchema[] {
-  return [...schemasFromGraph(index.graph, schemaFolder).schemas.values()].sort((a, b) => a.type.localeCompare(b.type));
+  return concreteTypes(schemasFromGraph(index.graph, schemaFolder)).sort((a, b) => a.type.localeCompare(b.type));
 }
 
 /** The Luhmann id of a note, with the type that gives it meaning; null when it has none. */
@@ -43,10 +44,12 @@ async function bodyAt(workspace: string, path: string | null): Promise<string | 
 export async function planWorkspaceNote(index: WorkspaceIndex, workspace: string, opts: NewNoteOptions): Promise<NewNotePlan & { path: string }> {
   const schema = schemasFromGraph(index.graph, opts.schemaFolder).schemas.get(opts.type);
   if (!schema) throw new Error(`No type '${opts.type}' in ${opts.schemaFolder}`);
+  if (schema.abstract) throw new Error(`Type '${opts.type}' is abstract; create a note of one of its subtypes`);
   if (!opts.title.trim() || BAD_TITLE.test(opts.title)) throw new Error(`"${opts.title}" cannot be used as a note title`);
-  const linked = schema.template ? templatePath(schema.template, schema.path, (link, from) => index.graph.resolveLink(link, from)) : null;
+  const templateNote = schema.templateNote ?? schema.path;
+  const linked = schema.template ? templatePath(schema.template, templateNote, (link, from) => index.graph.resolveLink(link, from)) : null;
   const linkedBody = await bodyAt(workspace, linked);
-  const schemaBody = (await bodyAt(workspace, schema.path)) ?? '';
+  const schemaBody = (await bodyAt(workspace, templateNote)) ?? '';
   const plan = planNewNote({ schema, title: opts.title.trim(), linkedBody, templatePath: linked, schemaBody, graph: index.graph, parent: opts.parent, luhmann: opts.luhmann, now: opts.now });
   const folder = opts.folder.replace(/^\/+|\/+$/g, '');
   return { ...plan, path: folder ? `${folder}/${plan.fileName}` : plan.fileName };

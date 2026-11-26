@@ -19,6 +19,7 @@ export {
   BUILTIN_PREFIXES,
   chooseTemplate,
   compactElements,
+  concreteTypes,
   compactProperties,
   compactSections,
   DEFAULT_BASE_IRI,
@@ -40,11 +41,13 @@ export {
   scaffoldSchemaNote,
   schemaSetFromNotes,
   schemasFromGraph,
+  subtypesOf,
   templatePath,
   TGS_NAMESPACE,
   TGS_FORMER_NAMESPACES,
   TGS_VERSION,
   validateSchemas,
+  withSupertypes,
 } from './schema/schema.js';
 export type { EdgeRule, EdgeTypeSchema, ElementSchema, PropertyKind, PropertySchema, SchemaNote, SchemaSet, SectionSchema, TypeSchema } from './schema/schema.js';
 export { flattenElements, parseAttributes, scanElements, scanHeadings } from './elements/scan.js';

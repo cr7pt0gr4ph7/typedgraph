@@ -84,6 +84,12 @@ export interface TypeSchema {
   elements?: ElementSchema[];
   /** Headings a document of this type has (TGS 0.4). */
   sections?: SectionSchema[];
+  /** Direct supertypes as declared in `is` (TGS 0.7); absent when none. */
+  is?: string[];
+  /** Declared `abstract: true` (TGS 0.7): a type for inheritance only, never written as a note's `type`. */
+  abstract?: boolean;
+  /** Path of the schema note that declares the template, when the type inherits it (TGS 0.7): its `template` link resolves from there, and with `bodyIsTemplate` its body is the template. */
+  templateNote?: string;
 }
 
 export interface EdgeTypeSchema {
@@ -109,7 +115,12 @@ export interface SchemaNote {
 }
 
 export interface SchemaSet {
+  /** Effective types: each with what it inherits from its supertypes (TGS 0.7). */
   schemas: Map<string, TypeSchema>;
+  /** Types exactly as declared, without inherited parts; what SHACL export and `tg ontology` show as a type's own. */
+  declared: Map<string, TypeSchema>;
+  /** Type name -> every supertype, nearest first, for types that declare `is`. */
+  supertypes: Map<string, string[]>;
   edgeTypes: Map<string, EdgeTypeSchema>;
   /** Built-in prefixes plus those declared in schema notes. */
   prefixes: Record<string, string>;
@@ -121,7 +132,8 @@ export const DEFAULT_SCHEMA_FOLDER = 'Types/';
 // @tg: implements:: [[openspec:tgs-spec#Versioning]]
 // @tg: implements:: [[openspec:tgs-spec#AsciiDoc notes in TGS 0.3]] {confidence: partial}
 // @tg: implements:: [[openspec:tgs-spec#TGS 0.6 published]]
-export const TGS_VERSION = '0.6';
+// @tg: implements:: [[openspec:tgs-spec#TGS 0.7 published]]
+export const TGS_VERSION = '0.7';
 // @tg: implements:: [[openspec:tgs-spec#Namespace IRI]]
 export const TGS_NAMESPACE = 'https://typedgraph.org/ns/tgs#';
 /** Namespaces the `tgs:` terms had before TGS 0.6; SHACL import reads them as {@link TGS_NAMESPACE}. */
@@ -139,7 +151,7 @@ export const BUILTIN_PREFIXES: Readonly<Record<string, string>> = {
 };
 const IRI_SCHEMES = new Set(['http', 'https', 'urn', 'mailto', 'tag', 'did', 'file']);
 
-const TYPE_KEYS = new Set(['properties', 'edges', 'visualization', 'style', 'uri', 'template', 'id', 'description', 'elements', 'sections']);
+const TYPE_KEYS = new Set(['properties', 'edges', 'visualization', 'style', 'uri', 'template', 'id', 'description', 'elements', 'sections', 'is', 'abstract']);
 const EDGE_TYPE_KEYS = new Set(['from', 'to', 'properties', 'uri', 'visualization', 'style', 'description']);
 const ELEMENT_KEYS = new Set(['description', 'type', 'required', 'many', 'node', 'attributes', 'elements']);
 
@@ -244,6 +256,9 @@ function readTypeBlock(type: string, path: string, decl: Record<string, unknown>
   const sections = readSections(decl.sections, diag);
   // An id property that is not declared is a plain text property.
   for (const r of ids) if (!properties.some((p) => p.name === r.property)) properties.push({ name: r.property, kind: 'text', default: null, required: false, many: false, values: null, uri: null });
+  const is = (readNames(decl.is, '`is`', diag) ?? []).map((n) => n.trim()).filter(Boolean);
+  if (is.includes(type)) diag(`\`is\` names the type itself`, 'inheritance-cycle');
+  if (decl.abstract !== undefined && typeof decl.abstract !== 'boolean') diag('`abstract` must be true or false');
   return {
     type,
     path,
@@ -257,6 +272,8 @@ function readTypeBlock(type: string, path: string, decl: Record<string, unknown>
     ...described(readString(decl.description, '`description`', diag)),
     ...(elements.length ? { elements } : {}),
     ...(sections.length ? { sections } : {}),
+    ...(is.length ? { is: [...new Set(is.filter((n) => n !== type))] } : {}),
+    ...(decl.abstract === true ? { abstract: true } : {}),
   };
 }
 
@@ -530,7 +547,7 @@ export function schemasFromGraph(graph: Graph, folder: string): SchemaSet {
 /** Merge schema notes into one set, reporting duplicates and bad identifiers. */
 // @tg: implements:: [[openspec:schema-notes#Duplicate type declarations]]
 export function schemaSetFromNotes(notes: SchemaNote[]): SchemaSet {
-  const set: SchemaSet = { schemas: new Map(), edgeTypes: new Map(), prefixes: { ...BUILTIN_PREFIXES }, diagnostics: [] };
+  const set: SchemaSet = { schemas: new Map(), declared: new Map(), supertypes: new Map(), edgeTypes: new Map(), prefixes: { ...BUILTIN_PREFIXES }, diagnostics: [] };
   const userPrefix = new Map<string, string>();
   const dup = (what: string, name: string, first: string, path: string) =>
     set.diagnostics.push({ path, line: 0, column: 0, message: `${what} '${name}' is declared in both ${first} and ${path}; using ${first}`, code: 'duplicate-declaration' });
@@ -569,7 +586,125 @@ export function schemaSetFromNotes(notes: SchemaNote[]): SchemaSet {
     check(e.uri, `Edge type '${e.type}'`, e.path);
     for (const p of e.properties) check(p.uri, `Property '${p.name}' of edge type '${e.type}'`, e.path);
   }
+  resolveInheritance(set);
   return set;
+}
+
+/**
+ * Resolve `is` declarations (TGS 0.7): check that every supertype exists, is
+ * abstract and is not part of a cycle; record each type's supertypes; and
+ * replace each type in `schemas` by its effective declaration, which adds
+ * what it inherits after what it declares itself.
+ */
+// @tg: implements:: [[openspec:schema-notes#Type inheritance]]
+// @tg: implements:: [[openspec:schema-notes#Inheritance diagnostics]]
+function resolveInheritance(set: SchemaSet): void {
+  for (const [name, t] of set.schemas) set.declared.set(name, t);
+  const report = (t: TypeSchema, code: string, message: string) => set.diagnostics.push({ path: t.path, line: 0, column: 0, message: `Type '${t.type}': ${message}`, code });
+  // Direct supertypes that may be used: declared, abstract and not the type itself.
+  const bases = new Map<string, string[]>();
+  for (const t of set.declared.values()) {
+    const ok: string[] = [];
+    for (const b of t.is ?? []) {
+      const base = set.declared.get(b);
+      if (!base) report(t, 'unknown-base-type', `\`is\` names '${b}', which is not a declared type; ignored`);
+      else if (!base.abstract) report(t, 'base-not-abstract', `\`is\` names '${b}', which is not abstract; ignored`);
+      else ok.push(b);
+    }
+    bases.set(t.type, ok);
+  }
+  // Break cycles: a supertype reached again on the current path is dropped and reported once per type.
+  const state = new Map<string, 'visiting' | 'done'>();
+  const visit = (name: string) => {
+    if (state.get(name) === 'done') return;
+    state.set(name, 'visiting');
+    const kept: string[] = [];
+    for (const b of bases.get(name) ?? []) {
+      if (state.get(b) === 'visiting') {
+        report(set.declared.get(name)!, 'inheritance-cycle', `\`is\` names '${b}', which inherits from '${name}'; ignored`);
+        continue;
+      }
+      visit(b);
+      kept.push(b);
+    }
+    bases.set(name, kept);
+    state.set(name, 'done');
+  };
+  for (const name of set.declared.keys()) visit(name);
+
+  const effective = new Map<string, TypeSchema>();
+  const resolve = (name: string): TypeSchema => {
+    const done = effective.get(name);
+    if (done) return done;
+    const own = set.declared.get(name)!;
+    const direct = bases.get(name) ?? [];
+    if (direct.length === 0) {
+      effective.set(name, own);
+      return own;
+    }
+    const supers: string[] = [];
+    const parents = direct.map((b) => {
+      const p = resolve(b);
+      for (const s of [b, ...(set.supertypes.get(b) ?? [])]) if (!supers.includes(s)) supers.push(s);
+      return p;
+    });
+    set.supertypes.set(name, supers);
+    // Properties: the type's own first, then each parent's in `is` order; the same name with another kind is a conflict.
+    const properties = [...own.properties];
+    const origin = new Map(own.properties.map((p) => [p.name, name]));
+    for (const [i, parent] of parents.entries()) {
+      for (const p of parent.properties) {
+        const prev = properties.find((q) => q.name === p.name);
+        if (!prev) {
+          properties.push(p);
+          origin.set(p.name, direct[i]!);
+          continue;
+        }
+        if (prev.kind === p.kind) continue;
+        const first = origin.get(p.name)!;
+        report(
+          own,
+          'property-conflict',
+          first === name
+            ? `property '${p.name}' is declared as ${prev.kind} but inherited from '${direct[i]}' as ${p.kind}`
+            : `property '${p.name}' is inherited as ${prev.kind} from '${first}' and as ${p.kind} from '${direct[i]}'`,
+        );
+      }
+    }
+    const merged = mergeSchemas([name, ...direct], new Map([[name, own], ...parents.map((p, i): [string, TypeSchema] => [direct[i]!, p])]))!;
+    const style = [own, ...parents].reduceRight<Record<string, unknown> | null>((acc, s) => (s.style ? { ...(acc ?? {}), ...s.style } : acc), null);
+    const withTemplate = own.template || own.bodyIsTemplate ? null : (parents.find((p) => p.template || p.bodyIsTemplate) ?? null);
+    const out: TypeSchema = {
+      ...own,
+      properties,
+      edges: merged.edges,
+      style,
+      ids: own.ids.length ? own.ids : (parents.find((p) => p.ids.length)?.ids ?? []),
+      ...(merged.elements ? { elements: merged.elements } : {}),
+      ...(merged.sections ? { sections: merged.sections } : {}),
+      ...(withTemplate ? { template: withTemplate.template, bodyIsTemplate: withTemplate.bodyIsTemplate, templateNote: withTemplate.templateNote ?? withTemplate.path } : {}),
+    };
+    effective.set(name, out);
+    return out;
+  };
+  for (const name of set.declared.keys()) set.schemas.set(name, resolve(name));
+}
+
+/** A node's labels followed by every supertype of each, without duplicates. */
+export function withSupertypes(labels: readonly string[], set: Pick<SchemaSet, 'supertypes'>): string[] {
+  const out = [...labels];
+  for (const l of labels) for (const s of set.supertypes.get(l) ?? []) if (!out.includes(s)) out.push(s);
+  return out;
+}
+
+/** Every type that inherits from `type`, directly or not. */
+export function subtypesOf(type: string, set: Pick<SchemaSet, 'supertypes'>): string[] {
+  return [...set.supertypes].filter(([, s]) => s.includes(type)).map(([t]) => t);
+}
+
+/** Types a note may be created as: every type that is not abstract. */
+export function concreteTypes(set: Pick<SchemaSet, 'schemas'>): TypeSchema[] {
+  return [...set.schemas.values()].filter((t) => !t.abstract);
 }
 
 /** Names of the allowed edge types, or null when unrestricted. */
@@ -627,14 +762,19 @@ const show = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v));
 // @tg: implements:: [[openspec:schema-notes#Edge property validation]]
 // @tg: implements:: [[openspec:schema-notes#Required property validation]]
 // @tg: implements:: [[openspec:schema-notes#Value and cardinality validation]]
+// @tg: implements:: [[openspec:schema-notes#Abstract types]]
+// @tg: implements:: [[openspec:schema-notes#Base type queries]]
 export function validateSchemas(graph: Graph, set: SchemaSet): Diagnostic[] {
   const out: Diagnostic[] = [];
   if (set.schemas.size === 0 && set.edgeTypes.size === 0) return out;
   const at = (path: string, line: number, code: string, message: string) => out.push({ path, line, column: 0, message, code });
   for (const n of graph.nodes()) {
     if (n.stub) continue;
-    const labels = n.labels.join(', ');
-    const schema = mergeSchemas(n.labels, set.schemas);
+    const written = graph.writtenLabels(n.id);
+    const nodeLabels = withSupertypes(n.labels, set);
+    const labels = written.join(', ');
+    for (const l of written) if (set.schemas.get(l)?.abstract) at(n.id, 0, 'abstract-type', `Type '${l}' is abstract; use one of its subtypes${subtypesOf(l, set).length ? ` (${subtypesOf(l, set).join(', ')})` : ''}`);
+    const schema = mergeSchemas(nodeLabels, set.schemas);
     const outEdges = graph.outEdges(n.id);
     if (schema) {
       for (const p of schema.properties) {
@@ -663,12 +803,12 @@ export function validateSchemas(graph: Graph, set: SchemaSet): Diagnostic[] {
       const targets = schema?.edges?.find((r) => r.type === e.type)?.targets ?? et?.to ?? null;
       if (targets) {
         const t = graph.node(e.target);
-        if (t && !t.stub && t.labels.length && !t.labels.some((l) => targets.includes(l))) {
-          at(e.file ?? n.id, e.line, 'wrong-target-type', `Edge '${e.type}' expects target type ${targets.join(' or ')}, found ${t.labels.join(', ')}`);
+        if (t && !t.stub && t.labels.length && !withSupertypes(t.labels, set).some((l) => targets.includes(l))) {
+          at(e.file ?? n.id, e.line, 'wrong-target-type', `Edge '${e.type}' expects target type ${targets.join(' or ')}, found ${graph.writtenLabels(t.id).join(', ')}`);
         }
       }
       if (!et) continue;
-      if (et.from && n.labels.length && !n.labels.some((l) => et.from!.includes(l))) {
+      if (et.from && n.labels.length && !nodeLabels.some((l) => et.from!.includes(l))) {
         at(e.file ?? n.id, e.line, 'wrong-source-type', `Edge '${e.type}' expects source type ${et.from.join(' or ')}, found ${labels}`);
       }
       for (const p of et.properties) {

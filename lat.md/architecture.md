@@ -35,6 +35,23 @@ A new note re-resolves only the links whose stubs carry its file name. Before, i
 
 Every host's resolver (Obsidian's metadata cache, [[packages/core/src/graph/resolve.ts#pathResolver]], the lat.md name map) resolves a link only to a note whose file name matches the link's last segment, case-insensitively. That makes the file name a safe key. Names that share a key by accident only cost an extra re-resolve. In issue #11, a vault of 5,600 notes and 230,000 edges took about 20 minutes to index. On a synthetic vault of that shape, core indexing went from about 12 minutes (extrapolated from 5.2 s for 500 notes and 21.8 s for 1,000) to 1.2 s.
 
+## Inferred supertype labels
+
+A node carries the supertypes of its written types as extra labels, set by `Graph.setTypeHierarchy`. A query on a base type is not rewritten into its subtypes.
+
+- motivated_by:: [[graph-model#Type inheritance]] {weight: primary, since: "0.32.0", note: "a query, edge type or edge rule names a whole family"}
+- motivated_by:: [[graph-model#Node types]] {weight: secondary, note: "every consumer already matches on labels"}
+
+Labels are what every consumer already matches: the built-in Cypher engine, the Ladybug mirror (which copies node labels into its rows), edge endpoint and target checks, `tg ontology check` and node styles. So adding supertypes once, where the graph is built, makes all of them agree.
+
+<option id="rewrite" outcome="rejected">
+
+Expand `(a:LegalEntity)` into `(a:Person|Company)` at match time. This needs the same expansion in the built-in engine, in the Ladybug backend's Cypher translation and in each validator. Any host that forgot one would disagree with the others.
+
+</option>
+
+The cost is that `labels(n)` lists the supertypes, and so do the mirror's rows. `Graph.writtenLabels` gives the labels as written, for the `abstract-type` check and for messages.
+
 ## No parse cache yet
 
 The plugin re-reads and re-parses every indexed note at startup instead of persisting parsed results keyed by modification time and size.

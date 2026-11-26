@@ -16,6 +16,7 @@ Sources and what comes from them:
 
 | Type | What it is |
 |---|---|
+| `ReadingSource` | Abstract: what every source shares, the `uid`, `year`, reading `status`, a required `authored_by` writer and `about` topics. No note is a `ReadingSource`, but edges and queries that name it reach all three kinds below. |
 | `BookSource`, `ArticleSource` | A book or an article, with `year`, reading `status` and (for articles) `publication` and `url`. Each needs `authored_by` a writer and can be `about` topics. |
 | `PaperSource` | A research paper, with `year`, `kind` (journal, conference, preprint, thesis, report), `venue`, `doi`, `url` and reading `status`. Needs `authored_by` a writer, and `cites` the books, articles and papers in its bibliography. |
 | `Writer` | The author of a source. |
@@ -32,7 +33,7 @@ Other edges: `extends`, `supports`, `example_of`, `follows` (with a `luhmann` id
 
 ## Ids and templates
 
-Every type gets a time-ordered `uid` (UUID version 7, which sorts as a string) when you create a note from it, so notes keep a stable id even when you rename them. Permanent notes can also carry a Luhmann id (`1`, `1a`, `1a1`, `2`): in Obsidian use *New child note*, *New sibling note* or *New top-level note*, in VS Code *TypeGraph: New Child Note*. The new note gets the next free id and a `follows` edge back to its parent, with the id on the edge. This needs TGS 0.2, so the schema note declares `tgs: "0.2"`.
+Every type gets a time-ordered `uid` (UUID version 7, which sorts as a string) when you create a note from it, so notes keep a stable id even when you rename them. Permanent notes can also carry a Luhmann id (`1`, `1a`, `1a1`, `2`): in Obsidian use *New child note*, *New sibling note* or *New top-level note*, in VS Code *TypeGraph: New Child Note*. The new note gets the next free id and a `follows` edge back to its parent, with the id on the edge. Books, articles and papers share one abstract `ReadingSource` type with `is` (TGS 0.7), so the schema note declares `tgs: "0.7"`.
 
 `Templates/` has one template per note type, with `{{title}}`, `{{date}}`, `{{parent-link}}` and `{{luhmann}}` filled in when the note is made. Edit them freely; a type's `template:` link points at its template.
 

@@ -26,6 +26,7 @@ Put the `Types/` notes of every ontology you want into one schema folder, togeth
 - **Build on, don't copy.** An ontology that needs another's types lists it in `requires.json` and its download includes it: `requirements` and `team` build on `code`.
 - **Open where others build.** A type that other ontologies build on declares no `edges` list, so their edge types can start at it; each edge type's `from` and `to` still say where it may start and end.
 - **Specific names, two labels.** Domain names are chosen not to collide (`Member`, not `Person`; `TeamAgent`, not `Agent`; `Writer`, not `Author`), and one note carries both when it belongs to both: `type: [Person, Member]`, `type: [Book, BookSource]`.
+- **Share inside, not across.** Types of one ontology that repeat properties share an abstract supertype with `is` (TGS 0.7), such as the zettelkasten's `ReadingSource` and the OKF's `CatalogEntry`. Its name follows the same one-owner rule, so it is specific too.
 - **Same files as tg.** `core-types.md`, `code-types.md` and `team-types.md` are byte-identical to what `tg init` and `tg gen team-types.md` write, so copying a download into a tg project replaces a file instead of declaring a name twice.
 
 ## Take it elsewhere
