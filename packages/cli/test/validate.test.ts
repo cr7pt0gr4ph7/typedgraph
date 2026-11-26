@@ -166,3 +166,26 @@ describe('tg validate', () => {
     expect(first.locations[0]!.physicalLocation.region.startLine).toBe(7);
   });
 });
+
+describe('inverse edges', () => {
+  // @tg: verifies:: [[tests/inverse-edges#tg validate checks inverse edges]] {level: integration}
+  it('reports lone ends and mismatches as warnings and a conflicting inverse as an error', async () => {
+    const dir = folder({
+      'Types/Edges.md': '---\ntgs: "0.7"\nedgeTypes:\n  worksAt: {inverseEdge: hasEmployee}\n  employs: {inverseEdge: hasEmployee}\n---\n',
+      'Ada.md': '- worksAt:: [[Acme]] {role: engineer}\n',
+      'Acme.md': '- hasEmployee:: [[Ada]] {role: manager}\n',
+      'Bob.md': '- worksAt:: [[Acme]]\n',
+    });
+    const r = await tg(dir, 'validate', '--json');
+    expect(r.code).toBe(1);
+    expect(json(r.out).findings.map((f) => [f.code, f.severity, f.path])).toEqual([
+      ['inverse-mismatch', 'warning', 'Acme.md'],
+      ['missing-inverse', 'warning', 'Bob.md'],
+      ['inverse-conflict', 'error', 'Types/Edges.md'],
+    ]);
+    const sarif = JSON.parse((await tg(dir, 'validate', '--format', 'sarif')).out) as { runs: { tool: { driver: { rules: { id: string; shortDescription: { text: string } }[] } } }[] };
+    const rules = Object.fromEntries(sarif.runs[0]!.tool.driver.rules.map((x) => [x.id, x.shortDescription.text]));
+    expect(rules['missing-inverse']).toBe('An inverse or symmetric edge is written at one end only');
+    expect(rules['inverse-conflict']).toContain('claimed by two edge types');
+  });
+});

@@ -53,7 +53,7 @@ export { ELEMENT_LABEL, elementDeclarations, findElementDecl, isElementNode, lat
 export type { ElementNode } from './elements/nodes.js';
 export { checkDocuments, noteDocumentDiagnostics } from './elements/validate.js';
 export type { DocumentFinding, DocumentFindingKind } from './elements/validate.js';
-export { buildView, canonicalType, canonicalView, edgeSemantics, edgesFrom, isPlain, nameFrom, readsFrom, writtenAt } from './schema/inverse.js';
+export { buildView, canonicalType, canonicalView, edgeSemantics, edgesFrom, isPlain, loneEnds, nameFrom, readsFrom, writtenAt } from './schema/inverse.js';
 export type { CanonicalView, EdgeSemantics } from './schema/inverse.js';
 export { applyInverseEdits, DEFAULT_INVERSE_HEADING, formatProps, planInverseSync } from './schema/maintain.js';
 export type { DeletionPolicy, InverseAction, InverseEdit, InversePlacement, InversePlan, InverseSyncOptions, SourceOfTruth } from './schema/maintain.js';

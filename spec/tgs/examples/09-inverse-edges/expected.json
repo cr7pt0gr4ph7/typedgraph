@@ -46,6 +46,15 @@
   ],
   "edgeTypes": [
     {
+      "name": "contains",
+      "note": "Types/Clash.md",
+      "iri": "urn:tgs:contains",
+      "from": null,
+      "to": null,
+      "properties": [],
+      "inverseEdge": "inside"
+    },
+    {
       "name": "friendsWith",
       "note": "Types/People.md",
       "iri": "urn:tgs:friendsWith",
@@ -64,6 +73,24 @@
       "iri": "urn:tgs:has_part",
       "from": null,
       "to": null,
+      "properties": [
+        {
+          "name": "count",
+          "iri": "urn:tgs:count",
+          "kind": "number",
+          "required": false,
+          "many": false,
+          "values": null,
+          "default": null
+        }
+      ]
+    },
+    {
+      "name": "holds",
+      "note": "Types/Clash.md",
+      "iri": "urn:tgs:holds",
+      "from": null,
+      "to": null,
       "properties": []
     },
     {
@@ -72,7 +99,17 @@
       "iri": "urn:tgs:part_of",
       "from": null,
       "to": null,
-      "properties": []
+      "properties": [
+        {
+          "name": "note",
+          "iri": "urn:tgs:note",
+          "kind": "text",
+          "required": false,
+          "many": false,
+          "values": null,
+          "default": null
+        }
+      ]
     },
     {
       "name": "worksAt",
@@ -108,9 +145,24 @@
       "diagnostic": "inverse-mismatch"
     },
     {
+      "path": "Acme.md",
+      "line": 6,
+      "diagnostic": "missing-inverse"
+    },
+    {
+      "path": "Initech.md",
+      "line": 5,
+      "diagnostic": "missing-inverse"
+    },
+    {
       "path": "Initech.md",
       "line": 5,
       "diagnostic": "too-many-edges"
+    },
+    {
+      "path": "Initech.md",
+      "line": 6,
+      "diagnostic": "missing-inverse"
     },
     {
       "path": "Initech.md",
@@ -126,6 +178,16 @@
       "path": "Types/Clash.md",
       "line": null,
       "diagnostic": "inverse-conflict"
+    },
+    {
+      "path": "Types/Clash.md",
+      "line": null,
+      "diagnostic": "inverse-conflict"
+    },
+    {
+      "path": "Types/Repeat.md",
+      "line": null,
+      "diagnostic": "inverse-duplicate"
     }
   ]
 }

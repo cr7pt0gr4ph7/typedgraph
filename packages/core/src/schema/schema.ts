@@ -1,6 +1,6 @@
 import { markdownTarget, type Diagnostic } from '../edges/parse.js';
 import { titleOf, type Graph, type GraphNode } from '../graph/graph.js';
-import { canonicalView, edgeSemantics, edgesFrom, isPlain, writtenAt } from './inverse.js';
+import { canonicalView, edgeSemantics, edgesFrom, isPlain, loneEnds, writtenAt } from './inverse.js';
 import { toYaml } from './frontmatter.js';
 import { ID_KINDS, type IdKind, type IdRule } from './ids.js';
 
@@ -591,27 +591,46 @@ export function schemaSetFromNotes(notes: SchemaNote[]): SchemaSet {
 }
 
 /**
- * An inverse name is another name of the declaring edge type, so it must not be declared as an edge
- * type itself, and two edge types must not share one. A conflicting `inverseEdge` is reported as
- * `inverse-conflict` and dropped, so the edge type reads as having no inverse.
+ * An inverse name is another name of the declaring edge type. When it is also declared as an edge type
+ * that says the same, reversed (swapped `from` and `to`, the same properties, and no other inverse),
+ * that declaration repeats the first: it is reported as `inverse-duplicate` and dropped. Any other
+ * declaration of the name, or a name two edge types claim, is an `inverse-conflict`, and the
+ * `inverseEdge` that names it is dropped, so that edge type reads as having no inverse.
  */
 // @tg: implements:: [[openspec:schema-notes#Inverse edge declarations]]
 function checkInverses(set: SchemaSet): void {
   const claimed = new Map<string, EdgeTypeSchema>();
+  const report = (path: string, message: string, code: string) => set.diagnostics.push({ path, line: 0, column: 0, message, code });
   const drop = (e: EdgeTypeSchema, message: string) => {
-    set.diagnostics.push({ path: e.path, line: 0, column: 0, message: `Edge type '${e.type}': ${message}; inverseEdge ignored`, code: 'inverse-conflict' });
+    report(e.path, `Edge type '${e.type}': ${message}; inverseEdge ignored`, 'inverse-conflict');
     const copy: EdgeTypeSchema = { ...e };
     delete copy.inverseEdge;
     set.edgeTypes.set(e.type, copy);
   };
-  for (const e of [...set.edgeTypes.values()]) {
+  for (const e0 of [...set.edgeTypes.values()]) {
+    // Dropped as a duplicate by an earlier edge type, or rewritten by drop().
+    if (set.edgeTypes.get(e0.type) !== e0) continue;
+    const e = e0;
     const inv = e.inverseEdge;
     if (inv === undefined || inv === e.type) continue;
     const other = set.edgeTypes.get(inv);
-    if (other) drop(e, `inverse '${inv}' is declared as an edge type in ${other.path}; declare one direction only`);
+    if (other && repeatsInverse(e, other)) {
+      report(other.path, `Edge type '${inv}' repeats '${e.type}' read from its target (${e.path}), with the same properties; declare one direction only; this declaration is ignored`, 'inverse-duplicate');
+      set.edgeTypes.delete(inv);
+      claimed.set(inv, e);
+    } else if (other) drop(e, `inverse '${inv}' is also declared as an edge type in ${other.path}, and the two declarations differ; declare one direction only`);
     else if (claimed.has(inv)) drop(e, `inverse '${inv}' is already the inverse of '${claimed.get(inv)!.type}' (${claimed.get(inv)!.path})`);
     else claimed.set(inv, e);
   }
+}
+
+/** True when `other` declares `e` read from its target: ends swapped, the same properties, and no other inverse. */
+function repeatsInverse(e: EdgeTypeSchema, other: EdgeTypeSchema): boolean {
+  const names = (l: string[] | null) => (l ? [...l].sort().join('\u0000') : null);
+  if (other.inverseEdge !== undefined && other.inverseEdge !== e.type) return false;
+  if (names(other.from) !== names(e.to) || names(other.to) !== names(e.from)) return false;
+  const props = (x: EdgeTypeSchema) => JSON.stringify(Object.entries(compactProperties(x.properties)).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+  return props(e) === props(other);
 }
 
 /** Names of the allowed edge types, or null when unrestricted. */
@@ -677,7 +696,7 @@ export function validateSchemas(graph: Graph, set: SchemaSet): Diagnostic[] {
   const sem = edgeSemantics(set);
   // Endpoints, properties and counts are checked on the canonical edges; which names a note may write, on the edges as written.
   const view = isPlain(sem) ? null : canonicalView(graph, set);
-  if (view) out.push(...view.diagnostics);
+  if (view) out.push(...view.diagnostics, ...loneEnds(view));
   for (const n of graph.nodes()) {
     if (n.stub) continue;
     const labels = n.labels.join(', ');

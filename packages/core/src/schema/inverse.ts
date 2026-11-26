@@ -82,6 +82,35 @@ export function edgesFrom(view: GraphView, nodeId: string, sem: EdgeSemantics): 
   return out;
 }
 
+/**
+ * `missing-inverse` for each edge of an inverse or symmetric type that is written at one end only: the
+ * note at its other end does not write it back. Edges declared in edge notes, self-loops and edges to
+ * stubs are not reported. Reported at the written end.
+ */
+// @tg: implements:: [[openspec:schema-notes#Inverse edge validation]]
+export function loneEnds(view: CanonicalView): Diagnostic[] {
+  const sem = view.semantics;
+  const out: Diagnostic[] = [];
+  if (isPlain(sem)) return out;
+  const title = (id: string) => String(view.node(id)?.props.title ?? id);
+  for (const e of view.edges()) {
+    if (e.merged || e.file || e.source === e.target) continue;
+    if (!sem.symmetric.has(e.type) && !sem.inverseName.has(e.type)) continue;
+    const [from, to] = e.written?.reversed ? [e.target, e.source] : [e.source, e.target];
+    const other = view.node(to);
+    if (!other || other.stub || view.node(from)?.stub) continue;
+    const back = nameFrom(e, to, sem);
+    out.push({
+      path: from,
+      line: e.line,
+      column: 0,
+      code: 'missing-inverse',
+      message: `Edge '${e.written?.type ?? e.type}' to ${title(to)} is written only here; ${title(to)} has no '${e.sign < 0 ? '-' : ''}${back}:: [[${title(from)}]]' (tg inverses --write adds it)`,
+    });
+  }
+  return out;
+}
+
 /** A graph with every edge in its declared type and direction, inverse sides merged, plus what merging found. */
 export interface CanonicalView extends GraphView {
   readonly semantics: EdgeSemantics;

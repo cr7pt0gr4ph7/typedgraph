@@ -419,7 +419,7 @@ edgeTypes:
     inverseEdge: friendsWith      # symmetric
 ```
 
-Only one direction is declared, so `from`, `to` and `properties` exist once. A reader MUST report an inverse name that is also declared as an edge type, or that two edge types share, as `inverse-conflict`, and MUST then read the edge type that names it as having no inverse. The edge type declared first by section 3.1 keeps a shared inverse name. A type's `edges` (section 5.3) MAY list an inverse name, because a type's rule is written from that type's side.
+Only one direction is declared, so `from`, `to` and `properties` exist once. When an inverse name is also declared as an edge type, a reader MUST compare the two declarations. A declaration that **repeats** the inverse, with `from` and `to` swapped, the same properties (in normal form) and no `inverseEdge` other than the declaring edge type, MUST be reported as `inverse-duplicate` and ignored; the inverse name keeps its meaning. Any other declaration of the name, and a name that two edge types share, MUST be reported as `inverse-conflict`, and the edge type that names it MUST then be read as having no inverse. The declaration that comes first by section 3.1 is the declaring one, and the edge type declared first keeps a shared inverse name. A type's `edges` (section 5.3) MAY list an inverse name, because a type's rule is written from that type's side.
 
 An edge has a name at each of its ends. At its declared source the name is its type. At its declared target the name is its inverse name, or its type when the type is symmetric. An edge whose type has no inverse has a name only at its source.
 
@@ -428,7 +428,7 @@ The **canonical edges** of a vault are its written edges with every edge written
 - an edge of a declared type and an edge written under its inverse name between the same notes in the opposite direction;
 - the two directions of a symmetric edge type between the same two notes.
 
-Both edges MUST have the same sign, and they pair in the order they are written. The canonical edge has the properties of the declared direction (for a symmetric type, of the edge written from the note that comes first in path order), filled in from the other end. Writing both ends is allowed.
+Both edges MUST have the same sign, and they pair in the order they are written. The canonical edge has the properties of the declared direction (for a symmetric type, of the edge written from the note that comes first in path order), filled in from the other end. Writing both ends is allowed and recommended: a validator SHOULD report an edge of an inverse or symmetric type that is written at one end only as `missing-inverse`, at the written end. Edges declared in edge notes, self-loops and edges to stubs are not reported.
 
 ## 7. Identifiers
 
@@ -500,8 +500,10 @@ For a node with labels L1, L2, …, the **effective schema** merges the schemas 
 | `wrong-source-type` | the source has labels and none is in the edge type's `from` |
 | `missing-edge-property` | a `required` edge property is absent from the edge |
 | `edge-value-not-allowed` | an edge property value is not in its `values` |
-| `inverse-conflict` | an inverse name is declared as an edge type, or two edge types share it (section 6.1; 0.7) |
+| `inverse-conflict` | an inverse name is declared as a different edge type, or two edge types share it (section 6.1; 0.7) |
+| `inverse-duplicate` | an inverse name is declared as an edge type that repeats it (section 6.1; 0.7) |
 | `inverse-mismatch` | the two written ends of one edge differ in a property other than `id`, or one end asserts an edge the other denies (section 6.1; 0.7); reported at the second end |
+| `missing-inverse` | an edge of an inverse or symmetric type is written at one end only (section 6.1; 0.7); SHOULD |
 
 Readers SHOULD report each diagnostic with the note path and, for edges, the line of the edge. Message text is not specified.
 
@@ -521,7 +523,7 @@ A schema note MAY declare `tgs: "<major>.<minor>"`. A reader implementing versio
 - MUST report a note that declares another major version as `unsupported-version` and MUST NOT use its declarations;
 - MUST read notes without `tgs` as version 0.1.
 
-TGS 0.2 adds the `id` key (section 8.1) and the template tokens. TGS 0.3 adds AsciiDoc notes (section 2.1) and adds no schema key. TGS 0.4 adds `description` (section 4.1), `elements` and `sections` (sections 4.2 to 4.5) and document validation (section 4.8); unknown keys inside an element declaration are reported like those of a type. TGS 0.5 adds no key. It fixes how elements are declared and read: the attribute keys that have a meaning and the reserved `id` (section 4.3), the scope of nested declarations and counting per container (section 4.4), and one normal form for every shorthand (section 4.9). TGS 0.6 adds no key and changes no rule. It moves the identifiers of the specification to `https://typedgraph.org/`: the address of each version, the JSON Schema `$id`, and the `tgs:` namespace, which was `https://volland.github.io/obsigraph/ns/tgs#` in versions 0.1 to 0.5 (section 13.4). TGS 0.7 adds `inverseEdge` to edge type declarations: inverse and symmetric edge types, canonical edges, the `inverse-conflict` and `inverse-mismatch` diagnostics (section 6.1) and the `tgs:inverseEdge` annotation (section 13.4). Every 0.1 note is a valid 0.2 note, every 0.2 note is a valid 0.3 note, every 0.3 note is a valid 0.4 note, every 0.4 note is a valid 0.5 note, every 0.5 note is a valid 0.6 note, and every 0.6 note is a valid 0.7 note.
+TGS 0.2 adds the `id` key (section 8.1) and the template tokens. TGS 0.3 adds AsciiDoc notes (section 2.1) and adds no schema key. TGS 0.4 adds `description` (section 4.1), `elements` and `sections` (sections 4.2 to 4.5) and document validation (section 4.8); unknown keys inside an element declaration are reported like those of a type. TGS 0.5 adds no key. It fixes how elements are declared and read: the attribute keys that have a meaning and the reserved `id` (section 4.3), the scope of nested declarations and counting per container (section 4.4), and one normal form for every shorthand (section 4.9). TGS 0.6 adds no key and changes no rule. It moves the identifiers of the specification to `https://typedgraph.org/`: the address of each version, the JSON Schema `$id`, and the `tgs:` namespace, which was `https://volland.github.io/obsigraph/ns/tgs#` in versions 0.1 to 0.5 (section 13.4). TGS 0.7 adds `inverseEdge` to edge type declarations: inverse and symmetric edge types, canonical edges, the `inverse-conflict`, `inverse-duplicate`, `inverse-mismatch` and `missing-inverse` diagnostics (section 6.1) and the `tgs:inverseEdge` annotation (section 13.4). Every 0.1 note is a valid 0.2 note, every 0.2 note is a valid 0.3 note, every 0.3 note is a valid 0.4 note, every 0.4 note is a valid 0.5 note, every 0.5 note is a valid 0.6 note, and every 0.6 note is a valid 0.7 note.
 
 Minor versions only add optional keys. A published version never changes.
 

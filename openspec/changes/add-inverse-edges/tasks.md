@@ -5,6 +5,7 @@
 - [x] 1.3 `validateSchemas` on the canonical view; annotate with `@tg: implements:: [[openspec:schema-notes#Inverse edge validation]]`
 - [x] 1.4 `tg ontology` lists inverses; `tg ontology check` accepts inverse names and reports `inverse-mismatch`
 - [x] 1.5 Tests annotated with `@tg: verifies::` to `tests/inverse-edges`
+- [x] 1.6 `inverse-duplicate` for a repeated inverse declaration, `missing-inverse` for lone ends, `inverse-conflict` an error in `tg validate`, SARIF rule texts
 
 ## 2. Cypher
 

@@ -15,6 +15,10 @@ Test specifications for inverse and symmetric edge types (TGS 0.7), described in
 
 An inverse name declared as an edge type, or claimed by two edge types, is an `inverse-conflict` and is ignored.
 
+## Repeated inverse declarations
+
+An edge type that repeats an inverse, ends swapped and with the same properties, is an `inverse-duplicate` warning and is dropped; ends that do not swap are a conflict.
+
 ## Inverse name is the same edge
 
 In the canonical view, an edge written with the inverse name is the declared edge turned around, while the graph keeps it as written.
@@ -34,6 +38,14 @@ An edge is named by its type at its declared source and by its inverse name at i
 ## Validation reads the declared direction
 
 Endpoints, edge properties and counts are checked on the declared direction, and an edge written from the other end satisfies a required edge.
+
+## Lone ends reported
+
+An edge of an inverse or symmetric type written at one end only is `missing-inverse` at that end; both-ended edges, self-loops and edges to stubs are not.
+
+## tg validate checks inverse edges
+
+`tg validate` reports lone ends and mismatches as warnings and a conflicting inverse as an error that fails the run, with SARIF rule texts for each code.
 
 ## Ontology check knows inverse names
 

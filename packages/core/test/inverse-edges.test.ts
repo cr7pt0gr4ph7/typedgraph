@@ -48,17 +48,41 @@ describe('inverse edge declarations', () => {
 
   // @tg: verifies:: [[tests/inverse-edges#Conflicting inverse names]] {level: unit}
   // @tg: verifies:: [[openspec:schema-notes#Inverse edge declarations#Inverse name declared twice]]
-  it('reports an inverse name that is declared as an edge type, or claimed twice', () => {
+  it('reports an inverse name declared differently as an edge type, or claimed twice, as a conflict', () => {
     const g = vault([
-      { path: 'Types/A.md', text: '', frontmatter: { edgeTypes: { has_part: { inverseEdge: 'part_of' }, part_of: {}, contains: { inverseEdge: 'inside' }, holds: { inverseEdge: 'inside' } } } },
+      {
+        path: 'Types/A.md',
+        text: '',
+        frontmatter: { edgeTypes: { has_part: { inverseEdge: 'part_of', properties: { count: 'number' } }, part_of: { properties: { note: 'text' } }, contains: { inverseEdge: 'inside' }, holds: { inverseEdge: 'inside' } } },
+      },
     ]);
     const set = schemasFromGraph(g, 'Types/');
     expect(set.diagnostics.map((d) => [d.code, d.message])).toEqual([
-      ['inverse-conflict', "Edge type 'has_part': inverse 'part_of' is declared as an edge type in Types/A.md; declare one direction only; inverseEdge ignored"],
+      ['inverse-conflict', "Edge type 'has_part': inverse 'part_of' is also declared as an edge type in Types/A.md, and the two declarations differ; declare one direction only; inverseEdge ignored"],
       ['inverse-conflict', "Edge type 'holds': inverse 'inside' is already the inverse of 'contains' (Types/A.md); inverseEdge ignored"],
     ]);
     expect(set.edgeTypes.get('has_part')?.inverseEdge).toBeUndefined();
+    expect(set.edgeTypes.has('part_of')).toBe(true);
     expect(set.edgeTypes.get('contains')?.inverseEdge).toBe('inside');
+  });
+
+  // @tg: verifies:: [[tests/inverse-edges#Repeated inverse declarations]] {level: unit}
+  // @tg: verifies:: [[openspec:schema-notes#Inverse edge declarations#Inverse name declared again the same way]]
+  it('drops an edge type that repeats an inverse the same way, reversed, with a warning', () => {
+    const g = vault([
+      { path: 'Types/A.md', text: '', frontmatter: { edgeTypes: { has_part: { from: 'Whole', to: 'Part', inverseEdge: 'part_of', properties: { count: 'number' } } } } },
+      // The other direction, declared again in another note, also pointing back.
+      { path: 'Types/B.md', text: '', frontmatter: { edgeTypes: { part_of: { from: 'Part', to: 'Whole', inverseEdge: 'has_part', properties: { count: { kind: 'number' } } }, swapped: { from: 'A', to: 'B', inverseEdge: 'swapped_of' }, swapped_of: { from: 'A', to: 'B' } } } },
+    ]);
+    const set = schemasFromGraph(g, 'Types/');
+    expect(set.diagnostics.map((d) => [d.code, d.path])).toEqual([
+      ['inverse-duplicate', 'Types/B.md'],
+      // Ends that do not swap are a different declaration.
+      ['inverse-conflict', 'Types/B.md'],
+    ]);
+    expect(set.edgeTypes.has('part_of')).toBe(false);
+    expect(set.edgeTypes.get('has_part')?.inverseEdge).toBe('part_of');
+    expect(edgeSemantics(set).inverseOf.get('part_of')).toBe('has_part');
   });
 });
 
@@ -151,7 +175,7 @@ describe('validation with inverse edges', () => {
       note('Initech.md', 'Company', '- hasEmployee:: [[Ada]] {role: intern}\n- hasEmployee:: [[Globex]]'),
       note('Globex.md', 'Company'),
     ]);
-    const diags = validateSchemas(g, schemasFromGraph(g, 'Types/'));
+    const diags = validateSchemas(g, schemasFromGraph(g, 'Types/')).filter((d) => d.code !== 'missing-inverse');
     expect(diags.map((d) => [d.path, d.code, d.message])).toEqual([
       ['Initech.md', 'too-many-edges', "Edge type 'worksAt' allows one edge for Person, found 2"],
       ['Initech.md', 'edge-value-not-allowed', "Edge property 'role' value 'intern' is not one of: engineer, manager"],
@@ -165,7 +189,25 @@ describe('validation with inverse edges', () => {
   it('lets an edge written from the other end satisfy a required edge', () => {
     const o: NoteInput = { ...ontology, frontmatter: { ...ontology.frontmatter, schemas: { Person: { edges: { worksAt: { target: 'Company', required: true } } }, Company: { edges: ['hasEmployee'] } } } };
     const g = vault([o, note('Ada.md', 'Person'), note('Bob.md', 'Person'), note('Acme.md', 'Company', '- hasEmployee:: [[Ada]]')]);
-    expect(validateSchemas(g, schemasFromGraph(g, 'Types/')).map((d) => [d.path, d.code])).toEqual([['Bob.md', 'missing-edge']]);
+    expect(validateSchemas(g, schemasFromGraph(g, 'Types/')).filter((d) => d.code !== 'missing-inverse').map((d) => [d.path, d.code])).toEqual([['Bob.md', 'missing-edge']]);
+  });
+
+  // @tg: verifies:: [[tests/inverse-edges#Lone ends reported]] {level: unit}
+  // @tg: verifies:: [[openspec:schema-notes#Inverse edge validation#Lone end reported]]
+  it('reports an edge written at one end only, at that end', () => {
+    const g = vault([
+      ontology,
+      note('Ada.md', 'Person', '- worksAt:: [[Acme]]\n- friendsWith:: [[Bob]]\n- friendsWith:: [[Ada]]\n- worksAt:: [[Nowhere]]'),
+      note('Bob.md', 'Person', '- friendsWith:: [[Ada]]'),
+      note('Acme.md', 'Company', '\n- -hasEmployee:: [[Cy]]'),
+      note('Cy.md', 'Person'),
+    ]);
+    const lone = validateSchemas(g, schemasFromGraph(g, 'Types/')).filter((d) => d.code === 'missing-inverse');
+    // Not reported: the friendship written on both ends, the self-loop, and the edge to a missing note.
+    expect(lone.map((d) => [d.path, d.line, d.message])).toEqual([
+      ['Ada.md', 0, "Edge 'worksAt' to Acme is written only here; Acme has no 'hasEmployee:: [[Ada]]' (tg inverses --write adds it)"],
+      ['Acme.md', 1, "Edge 'hasEmployee' to Cy is written only here; Cy has no '-worksAt:: [[Acme]]' (tg inverses --write adds it)"],
+    ]);
   });
 });
 
