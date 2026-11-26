@@ -9,7 +9,7 @@ Test specifications for the published Typed Graph Schema specification, its JSON
 
 ## Conformance examples pass
 
-Every example in `spec/tgs/examples` gives the expected declarations and diagnostics through the reader and validator, the expected SHACL where present, and the expected JSON Schema result per note.
+Every example in `spec/tgs/examples` gives the expected declarations and diagnostics through the reader and validator, the expected SHACL and OWL where present, and the expected JSON Schema result per note.
 
 ## Spec examples validate
 
@@ -38,6 +38,10 @@ Archived 0.6 has its version address, `tgs:` namespace and JSON Schema `$id` und
 ## Version 0.7 adds type inheritance
 
 `SPEC.md` is 0.7 with section 4.10 Inheritance, and the site build publishes 0.7. The JSON Schema `$id` is the 0.7 address and accepts `is` and `abstract`, which the archived 0.6 JSON Schema rejects.
+
+## Version 0.7 published with the OWL mapping
+
+`SPEC.md` is 0.7 with section 14, the OWL mapping, and an OWL exporter conformance level; the JSON Schema `$id` and the site build name 0.7, and archived 0.6 has no OWL mapping.
 
 ## Former namespace imports unchanged
 

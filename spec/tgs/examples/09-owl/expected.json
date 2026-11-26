@@ -1,0 +1,216 @@
+{
+  "invalidAgainstJsonSchema": [],
+  "types": [
+    {
+      "name": "Bot",
+      "note": "Types/People.md",
+      "iri": "urn:tgs:Bot",
+      "properties": [
+        {
+          "name": "name",
+          "iri": "urn:tgs:name",
+          "kind": "text",
+          "required": false,
+          "many": false,
+          "values": null,
+          "default": null
+        }
+      ],
+      "edges": null,
+      "template": null
+    },
+    {
+      "name": "Person",
+      "note": "Types/People.md",
+      "iri": "urn:tgs:Person",
+      "properties": [
+        {
+          "name": "name",
+          "iri": "urn:tgs:name",
+          "kind": "text",
+          "required": true,
+          "many": false,
+          "values": null,
+          "default": null,
+          "description": "What the thing is called."
+        },
+        {
+          "name": "email",
+          "iri": "urn:tgs:email",
+          "kind": "link",
+          "required": false,
+          "many": false,
+          "values": [
+            "mailto:a@example.org"
+          ],
+          "default": null
+        },
+        {
+          "name": "status",
+          "iri": "urn:tgs:status",
+          "kind": "text",
+          "required": false,
+          "many": false,
+          "values": [
+            "active",
+            "retired"
+          ],
+          "default": null
+        },
+        {
+          "name": "since",
+          "iri": "urn:tgs:since",
+          "kind": "date",
+          "required": false,
+          "many": false,
+          "values": null,
+          "default": null
+        },
+        {
+          "name": "nicknames",
+          "iri": "urn:tgs:nicknames",
+          "kind": "list",
+          "required": false,
+          "many": true,
+          "values": null,
+          "default": null
+        }
+      ],
+      "edges": [
+        {
+          "type": "worksOn",
+          "targets": [
+            "Project"
+          ],
+          "many": true,
+          "required": true,
+          "description": "The projects a person spends time on."
+        },
+        {
+          "type": "mentor",
+          "targets": [
+            "Person"
+          ],
+          "many": false,
+          "required": false
+        },
+        {
+          "type": "knows",
+          "targets": [
+            "Person",
+            "Bot"
+          ],
+          "many": true,
+          "required": false
+        },
+        {
+          "type": "likes",
+          "targets": null,
+          "many": true,
+          "required": false,
+          "description": "Anything a person likes."
+        },
+        {
+          "type": "member",
+          "targets": null,
+          "many": true,
+          "required": true
+        }
+      ],
+      "template": null,
+      "description": "A human being.",
+      "sections": [
+        {
+          "heading": "Background",
+          "description": "Where the person comes from.",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "Project",
+      "note": "Types/People.md",
+      "iri": "urn:tgs:Project",
+      "properties": [
+        {
+          "name": "name",
+          "iri": "urn:tgs:name",
+          "kind": "text",
+          "required": true,
+          "many": false,
+          "values": null,
+          "default": null
+        },
+        {
+          "name": "status",
+          "iri": "urn:tgs:status",
+          "kind": "number",
+          "required": false,
+          "many": false,
+          "values": null,
+          "default": null
+        }
+      ],
+      "edges": null,
+      "template": null
+    }
+  ],
+  "edgeTypes": [
+    {
+      "name": "member",
+      "note": "Types/Edges.md",
+      "iri": "urn:tgs:member",
+      "from": null,
+      "to": [
+        "Team"
+      ],
+      "properties": []
+    },
+    {
+      "name": "worksOn",
+      "note": "Types/Edges.md",
+      "iri": "urn:tgs:worksOn",
+      "from": [
+        "Person",
+        "Bot"
+      ],
+      "to": [
+        "Project"
+      ],
+      "properties": [
+        {
+          "name": "since",
+          "iri": "urn:tgs:since",
+          "kind": "date",
+          "required": false,
+          "many": false,
+          "values": null,
+          "default": null
+        },
+        {
+          "name": "role",
+          "iri": "urn:tgs:role",
+          "kind": "text",
+          "required": true,
+          "many": false,
+          "values": [
+            "lead",
+            "contributor"
+          ],
+          "default": null
+        },
+        {
+          "name": "hours",
+          "iri": "urn:tgs:hours",
+          "kind": "number",
+          "required": false,
+          "many": false,
+          "values": null,
+          "default": 0
+        }
+      ],
+      "description": "Time spent on a project."
+    }
+  ],
+  "diagnostics": []
+}

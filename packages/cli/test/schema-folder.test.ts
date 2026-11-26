@@ -96,12 +96,15 @@ describe('commands that read the schema', () => {
     const count = async (...flags: string[]) => JSON.parse((await tg(dir, ['cypher', '--json', ...flags, query])).out).rows;
     expect(await count()).toEqual([[1]]);
     expect(await count('--schema-folder', 'Ontology')).toEqual([[1]]);
-    expect(await count('--schema-folder', 'Nothing')).toEqual([[0]]);
+    const missing = await tg(dir, ['cypher', '--json', '--schema-folder', 'Nothing', query]);
+    expect(missing.code).toBe(2);
+    expect(missing.out).toBe('');
+    expect(missing.err).toContain('Nothing/ has no schema notes');
     expect((await tg(dir, ['validate', '--json'])).code).toBe(0);
     expect(JSON.parse((await tg(dir, ['validate', '--schema-only', '--json'])).out).notes).toBeGreaterThan(0);
     const exported = await tg(dir, ['schema', 'export', join(dir, 'out.ttl'), '--json']);
     expect(JSON.parse(exported.out)).toMatchObject({ types: 3, edgeTypes: 1 });
-    const empty = await tg(dir, ['schema', 'export', join(dir, 'empty.ttl'), '--schema-folder', 'Nothing', '--json']);
+    const empty = await tg(dir, ['schema', 'export', join(dir, 'empty.ttl'), '--schema-folder', 'Nothing', '--ignore', 'missing-ontology', '--json']);
     expect(JSON.parse(empty.out)).toMatchObject({ types: 0, edgeTypes: 0 });
     const migrated = await tg(dir, ['migrate', '--dry-run', '--json', '--no-setup', '--no-since', '--force']);
     expect(migrated.code).toBe(0);

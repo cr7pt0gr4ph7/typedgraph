@@ -1,4 +1,5 @@
 import { concreteTypes, findLuhmannParent, isSchemaPath, luhmannRule, luhmannTypes, normalizeFolder, planNewNote, scaffoldSchemaNote, splitFrontmatter, templatePath, type Diagnostic, type LuhmannParent, type TypeSchema } from '@obsigraph/core';
+import { exportOwl, type OwlLoss } from '@obsigraph/core/src/owl.js';
 import { exportShacl, importShacl, planImport, type ExistingNote, type ImportPlan, type ShaclImport } from '@obsigraph/core/src/shacl.js';
 import { App, getIcon, Menu, Modal, Notice, normalizePath, Setting, SuggestModal, TFile, TFolder } from 'obsidian';
 import type ObsigraphPlugin from './main';
@@ -179,6 +180,12 @@ export function registerSchemaCommands(plugin: ObsigraphPlugin): void {
   });
 
   plugin.addCommand({
+    id: 'export-schemas-owl',
+    name: 'Export schemas as OWL',
+    callback: () => new PromptModal(app, 'Write the OWL ontology to', (path) => void exportOntology(plugin, path), 'ontology.ttl', 'Export').open(),
+  });
+
+  plugin.addCommand({
     id: 'import-shacl-shapes',
     name: 'Import SHACL shapes',
     callback: () =>
@@ -253,6 +260,31 @@ class ImportReportModal extends Modal {
   }
 }
 
+/** Shows what an OWL export could not express. */
+class LossReportModal extends Modal {
+  constructor(
+    app: App,
+    private readonly title: string,
+    private readonly losses: OwlLoss[],
+  ) {
+    super(app);
+  }
+  onOpen(): void {
+    this.titleEl.setText(this.title);
+    if (!this.losses.length) {
+      this.contentEl.createDiv({ text: 'Everything was expressed in OWL.', cls: 'obsigraph-status' });
+      return;
+    }
+    this.contentEl.createEl('h4', { text: 'Not expressed in OWL' });
+    const ul = this.contentEl.createEl('ul');
+    for (const l of this.losses) ul.createEl('li', { text: `${l.subject}: ${l.message}` });
+    this.contentEl.createEl('small', { text: 'Validation stays with the plugin and the SHACL export; OWL describes meaning, not checks.', cls: 'obsigraph-muted' });
+  }
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
+
 /** Schema notes with their text and cached frontmatter. */
 async function schemaNotes(plugin: ObsigraphPlugin): Promise<ExistingNote[]> {
   const { app } = plugin;
@@ -270,6 +302,20 @@ async function exportSchemas(plugin: ObsigraphPlugin, path: string): Promise<voi
   const target = normalizePath(path);
   await app.vault.adapter.write(target, exportShacl(set, { base: plugin.settings.schemaBaseIri, body: (p) => bodies.get(p) ?? null }));
   new Notice(`Exported ${set.schemas.size} types and ${set.edgeTypes.size} edge types to ${target}.`);
+}
+
+// @tg: implements:: [[shacl#OWL export]] {since: "2026-11-26"}
+// @lat: [[shacl#OWL export]]
+// @tg: implements:: [[openspec:owl-export#Loss report]]
+async function exportOntology(plugin: ObsigraphPlugin, path: string): Promise<void> {
+  const { app } = plugin;
+  const set = plugin.index.schemas();
+  const bodies = new Map((await schemaNotes(plugin)).map((n) => [n.path, splitFrontmatter(n.text).body]));
+  const target = normalizePath(path);
+  const folder = normalizeFolder(plugin.settings.schemaFolder);
+  const owl = exportOwl(set, { base: plugin.settings.schemaBaseIri, label: folder.replace(/\/$/, '') || undefined, body: (p) => bodies.get(p) ?? null });
+  await app.vault.adapter.write(target, owl.turtle);
+  new LossReportModal(app, `Exported ${set.schemas.size} types and ${set.edgeTypes.size} edge types to ${target}`, owl.losses).open();
 }
 
 // @tg: implements:: [[shacl#Commands]] {since: "2026-10-06"}

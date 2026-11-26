@@ -1,0 +1,139 @@
+# Typed Graph Schema (TGS 0.7) exported as OWL 2
+@prefix : <urn:tgs:> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix schema: <https://schema.org/> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix tgs: <https://typedgraph.org/ns/tgs#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:tgs:>
+    a owl:Ontology ;
+    owl:versionInfo "TGS 0.7" .
+
+tgs:edgeType
+    a owl:AnnotationProperty .
+
+tgs:edgesClosed
+    a owl:AnnotationProperty .
+
+tgs:kind
+    a owl:AnnotationProperty .
+
+tgs:note
+    a owl:AnnotationProperty .
+
+tgs:template
+    a owl:AnnotationProperty .
+
+tgs:templateBody
+    a owl:AnnotationProperty .
+
+tgs:visualization
+    a owl:AnnotationProperty .
+
+schema:Organization
+    a owl:Class ;
+    rdfs:label "Company" ;
+    tgs:note "Types/Company.md" ;
+    tgs:templateBody "## About" ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :founded ;
+        owl:maxCardinality "1"^^xsd:nonNegativeInteger
+    ] ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :public ;
+        owl:maxCardinality "1"^^xsd:nonNegativeInteger
+    ] .
+
+schema:Person
+    a owl:Class ;
+    rdfs:label "Person" ;
+    tgs:note "Types/Person.md" ;
+    tgs:template "[[Templates/Person]]" ;
+    tgs:visualization "{\"color\":\"#3b82f6\",\"icon\":\"user\"}" ;
+    tgs:edgesClosed true ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty schema:name ;
+        owl:minCardinality "1"^^xsd:nonNegativeInteger
+    ] ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty schema:name ;
+        owl:maxCardinality "1"^^xsd:nonNegativeInteger
+    ] ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :score ;
+        owl:maxCardinality "1"^^xsd:nonNegativeInteger
+    ] ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty schema:worksFor ;
+        owl:allValuesFrom schema:Organization
+    ] ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :knows ;
+        owl:allValuesFrom schema:Person
+    ] .
+
+schema:worksFor
+    a owl:ObjectProperty ;
+    rdfs:label "worksAt" ;
+    rdfs:domain schema:Person ;
+    rdfs:range schema:Organization ;
+    tgs:note "Types/Company.md" ;
+    tgs:visualization "{\"color\":\"green\"}" .
+
+:knows
+    a owl:ObjectProperty ;
+    rdfs:label "knows" ;
+    rdfs:isDefinedBy <urn:tgs:> .
+
+schema:name
+    a owl:DatatypeProperty ;
+    rdfs:label "name" ;
+    rdfs:domain schema:Person ;
+    rdfs:range xsd:string .
+
+:founded
+    a owl:DatatypeProperty ;
+    rdfs:label "founded" ;
+    rdfs:isDefinedBy <urn:tgs:> ;
+    rdfs:domain schema:Organization ;
+    rdfs:range xsd:date .
+
+:public
+    a owl:DatatypeProperty ;
+    rdfs:label "public" ;
+    rdfs:isDefinedBy <urn:tgs:> ;
+    rdfs:domain schema:Organization ;
+    rdfs:range xsd:boolean .
+
+:score
+    a owl:DatatypeProperty ;
+    rdfs:label "score" ;
+    rdfs:isDefinedBy <urn:tgs:> ;
+    rdfs:domain schema:Person ;
+    rdfs:range xsd:decimal .
+
+:tags
+    a owl:DatatypeProperty ;
+    rdfs:label "tags" ;
+    rdfs:isDefinedBy <urn:tgs:> ;
+    rdfs:domain schema:Person ;
+    rdfs:range xsd:string ;
+    tgs:kind "list" .
+
+:since
+    a owl:AnnotationProperty ;
+    rdfs:label "since" ;
+    rdfs:isDefinedBy <urn:tgs:> ;
+    rdfs:range xsd:date ;
+    tgs:edgeType schema:worksFor .

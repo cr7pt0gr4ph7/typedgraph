@@ -138,7 +138,7 @@ The relations come from your ontology, the cue words from the sentence (`because
 | `tg ontology` / `ontology check` | List the project's types and edge types from the schema folder (`Types/`); check written typed edges against them |
 | `tg trace [capability] --gaps` | Which code implements, which tests verify and which docs explain each OpenSpec requirement |
 | `tg validate` | Check a notes vault against its schema notes, with JSON or SARIF for CI |
-| `tg schema export` / `import` | Exchange schemas with RDF tools as SHACL |
+| `tg schema export` / `import` | Exchange schemas with RDF tools as SHACL; export them as an OWL 2 ontology with `--format owl` |
 | `tg export` / `import` | Move notes between an Obsidian vault and a `lat.md/` folder or an OKF bundle |
 | `tg mcp` | MCP server over stdio for any agent |
 | `tg hook` | Agent hook handler (installed by `tg init`) |
