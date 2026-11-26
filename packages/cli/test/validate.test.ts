@@ -69,16 +69,38 @@ describe('tg validate', () => {
     expect(await tg(v, 'validate')).toEqual({ code: 0, out: 'No findings in 2 notes.\n', err: '' });
   });
 
-  // @tg: verifies:: [[tests/tg-validate#Vault without schemas]] {since: "2026-10-09", level: unit}
+  // @tg: verifies:: [[tests/tg-validate#Vault without schemas]] {since: "2026-11-26", level: unit}
   // @lat: [[tests/tg-validate#Vault without schemas]]
-  // @tg: verifies:: [[openspec:tg-validate#Validate a vault#Vault without schemas]]
-  it('reports only syntax and embed findings when there are no schema notes', async () => {
+  // @tg: verifies:: [[openspec:tg-validate#Missing schema folder#Vault without schemas]]
+  it('reports a missing-schema error, then only syntax and embed findings, when there are no schema notes', async () => {
     const v = folder({ 'Alice.md': '---\ntype: Person\n---\nknows:: [[Bob]] {since: }\n\n{{ edge:  }}\n', 'Bob.md': '# Bob\n' });
-    const r = json((await tg(v, 'validate', '--json')).out);
-    expect(r.findings.map((f) => [f.code, f.line])).toEqual([
-      ['edge-syntax', 4],
-      ['embed', 6],
+    const res = await tg(v, 'validate', '--json');
+    expect(res.code).toBe(1);
+    const r = json(res.out);
+    expect(r.ok).toBe(false);
+    expect(r.findings.map((f) => [f.code, f.severity, f.path, f.line])).toEqual([
+      ['missing-schema', 'error', 'Types', null],
+      ['edge-syntax', 'warning', 'Alice.md', 4],
+      ['embed', 'warning', 'Alice.md', 6],
     ]);
+    expect(r.findings[0]!.message).toBe('schema folder Types/ not found; pass --schema-folder, or --ignore missing-schema for a vault without schemas');
+    const ignored = await tg(v, 'validate', '--json', '--ignore', 'missing-schema');
+    expect(ignored.code).toBe(0);
+    expect(json(ignored.out).findings.map((f) => f.code)).toEqual(['edge-syntax', 'embed']);
+  });
+
+  // @tg: verifies:: [[tests/tg-validate#Empty schema folder]] {since: "2026-11-26", level: unit}
+  // @lat: [[tests/tg-validate#Empty schema folder]]
+  // @tg: verifies:: [[openspec:tg-validate#Missing schema folder#Schema folder without schema notes]]
+  it('reports missing-schema for a schema folder without schema notes, also with --schema-only and in text', async () => {
+    const v = folder({ 'Types/README.txt': 'later\n', 'Types/sub/Person.md': PERSON, 'Bob.md': '# Bob\n' });
+    const text = await tg(v, 'validate');
+    expect(text.code).toBe(1);
+    expect(text.out).toContain('Types: error missing-schema: schema folder Types/ has no schema notes (*.md);');
+    expect(text.out).toContain('1 error and 0 warnings');
+    expect((await tg(v, 'validate', '--schema-only')).code).toBe(1);
+    const other = json((await tg(folder({ 'Types/Person.md': PERSON }), 'validate', '--json', '--schema-folder', 'Schemas')).out);
+    expect(other.findings.map((f) => [f.code, f.path])).toEqual([['missing-schema', 'Schemas']]);
   });
 
   // @tg: verifies:: [[tests/tg-validate#Finding codes]] {since: "2026-10-09", level: unit}

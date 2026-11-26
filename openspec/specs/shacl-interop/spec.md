@@ -6,7 +6,7 @@ Exchanges vault schemas with the RDF world: exports schema notes as W3C SHACL sh
 ## Requirements
 
 ### Requirement: Export schemas as SHACL
-The system SHALL export every type and edge type in the schema folder as one SHACL document in Turtle, from the CLI (`tg schema export <out.ttl> --format shacl [--vault dir] [--base iri]`) and from a plugin command, and the output SHALL be deterministic so unchanged schemas produce byte-identical files.
+The system SHALL export every type and edge type in the schema folder as one SHACL document in Turtle, from the CLI (`tg schema export <out.ttl> --format shacl [--vault dir] [--base iri]`) and from a plugin command, and the output SHALL be deterministic so unchanged schemas produce byte-identical files. The CLI SHALL refuse to export, as [[openspec:tg-cli#Schema folder required]] says, when the schema folder holds no schema notes.
 
 #### Scenario: Export from the CLI
 - **WHEN** the user runs `tg schema export shapes.ttl --format shacl` in a vault with `Person` and `Company` schemas
@@ -17,8 +17,8 @@ The system SHALL export every type and edge type in the schema folder as one SHA
 - **THEN** both files are byte-identical
 
 #### Scenario: Empty schema folder
-- **WHEN** the vault has no schema notes
-- **THEN** the export writes a document with prefixes only and reports that no types were found
+- **WHEN** the vault has no schema folder, or one without schema notes
+- **THEN** the CLI prints the error to stderr, writes no file and exits 2
 
 ### Requirement: Node type mapping
 The system SHALL export each type as a `sh:NodeShape` whose `sh:targetClass` is the type's `uri` or the base IRI plus the type name, and each property as a property shape with `sh:path`, a datatype from its kind (text → `xsd:string`, number → `xsd:decimal`, boolean → `xsd:boolean`, date → `xsd:date`, datetime → `xsd:dateTime`, link → `sh:nodeKind sh:IRI`, list → `xsd:string` with many), `sh:minCount 1` when required, `sh:maxCount 1` unless many, `sh:defaultValue` for a default and `sh:in` for `values`.

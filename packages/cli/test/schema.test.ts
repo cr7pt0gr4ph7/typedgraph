@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { expect, it } from 'vitest';
@@ -24,6 +24,7 @@ async function tg(cwd: string, ...args: string[]) {
 // @tg: verifies:: [[tests/shacl-interop#Schema commands]] {since: "2026-10-06", level: unit}
 // @lat: [[tests/shacl-interop#Schema commands]]
 // @tg: verifies:: [[openspec:shacl-interop#Export schemas as SHACL#Empty schema folder]]
+// @tg: verifies:: [[openspec:tg-cli#Schema folder required#Missing schema folder]]
 // @tg: verifies:: [[openspec:shacl-interop#Export schemas as SHACL#Export from the CLI]]
 it('exports schema notes as SHACL and imports them into another vault with a report', async () => {
   const v = folder({
@@ -41,8 +42,12 @@ it('exports schema notes as SHACL and imports them into another vault with a rep
 
   const empty = folder({ 'Note.md': '# Hi\n' });
   const e = await tg(empty, 'schema', 'export', 'shapes.ttl');
-  expect(e.code).toBe(0);
-  expect(e.out).toBe('No types found in Types/; wrote prefixes only to shapes.ttl.\n');
+  expect(e).toEqual({ code: 2, out: '', err: 'schema folder Types/ not found; pass --schema-folder or --vault\n' });
+  expect(existsSync(join(empty, 'shapes.ttl'))).toBe(false);
+  const bare = await tg(folder({ 'Types/README.txt': 'later\n' }), 'schema', 'export', 'shapes.ttl', '--json');
+  expect(bare.code).toBe(2);
+  expect(bare.out).toBe('');
+  expect(bare.err).toContain('schema folder Types/ has no schema notes (*.md)');
 
   const target = folder({});
   const i = await tg(target, 'schema', 'import', join(v, 'out/shapes.ttl'), '--layout', 'single', '--into', 'Org');

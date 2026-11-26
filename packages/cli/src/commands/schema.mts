@@ -4,6 +4,7 @@ import { DEFAULT_SCHEMA_FOLDER, normalizeFolder, readSchemaNote, schemaSetFromNo
 import { exportShacl, importShacl, planImport, type ExistingNote } from '@obsigraph/core/src/shacl.js';
 import { parse as parseYaml } from 'yaml';
 import { EXIT_ERROR, EXIT_FINDINGS, EXIT_OK, register, type Command, type Ctx } from '../cli.mjs';
+import { missingSchema } from '../schema-folder.mjs';
 
 const USAGE = [
   'schema export <out.ttl> [--format shacl] [--vault dir] [--schema-folder Types] [--base iri]',
@@ -36,10 +37,16 @@ const str = (flags: Map<string, string | true>, k: string) => (typeof flags.get(
 // @tg: implements:: [[shacl#Commands]] {since: "2026-10-06"}
 // @lat: [[shacl#Commands]]
 // @tg: implements:: [[openspec:shacl-interop#Export schemas as SHACL]]
+// @tg: implements:: [[openspec:tg-cli#Schema folder required]]
 function runExport(ctx: Ctx, outArg: string, vault: string, folder: string, flags: Map<string, string | true>): number {
   const format = str(flags, 'format') ?? 'shacl';
   if (format !== 'shacl') {
     ctx.err(`unknown format "${format}"; expected shacl\n`);
+    return EXIT_ERROR;
+  }
+  const noSchema = missingSchema(vault, folder, 'pass --schema-folder or --vault');
+  if (noSchema) {
+    ctx.err(`${noSchema}\n`);
     return EXIT_ERROR;
   }
   const notes = readSchemaNotes(vault, folder);

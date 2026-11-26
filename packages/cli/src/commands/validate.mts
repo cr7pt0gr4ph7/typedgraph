@@ -1,8 +1,9 @@
 import { existsSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
-import { DEFAULT_SCHEMA_FOLDER, normalizeFolder, validateVault, type VaultFinding, type NoteInput } from '@obsigraph/core';
+import { DEFAULT_SCHEMA_FOLDER, normalizeFolder, severityOf, validateVault, type VaultFinding, type NoteInput } from '@obsigraph/core';
 import { listNotes, parseYaml, readNote } from '@obsigraph/node-vault';
 import { EXIT_ERROR, EXIT_FINDINGS, EXIT_OK, register, VERSION, type Command, type Ctx } from '../cli.mjs';
+import { MISSING_SCHEMA, missingSchema } from '../schema-folder.mjs';
 
 const USAGE = 'validate [--vault dir] [--schema-folder Types] [--only codes] [--ignore codes] [--schema-only] [--frontmatter-edges] [--strict] [--format text|json|sarif]';
 
@@ -32,6 +33,7 @@ const RULES: Record<string, string> = {
   'adoc-visible-edge': 'Edge syntax in AsciiDoc outside a comment renders as a description list',
   'adoc-meta-conflict': 'A property is set by both the leading block and a :tg-*: attribute',
   'frontmatter-yaml': 'The leading comment block of an AsciiDoc note is not valid YAML',
+  'missing-schema': 'The schema folder is missing or holds no schema notes',
 };
 
 const str = (flags: Map<string, string | true>, k: string) => (typeof flags.get(k) === 'string' ? (flags.get(k) as string) : undefined);
@@ -87,6 +89,7 @@ function sarif(findings: VaultFinding[], vault: string, cwd: string): string {
 // @tg: implements:: [[openspec:tg-validate#Exit codes and strictness]]
 // @tg: implements:: [[openspec:tg-validate#Selecting findings]]
 // @tg: implements:: [[openspec:tg-validate#Output formats]]
+// @tg: implements:: [[openspec:tg-validate#Missing schema folder]]
 async function runValidate(ctx: Ctx, flags: Map<string, string | true>): Promise<number> {
   const started = Date.now();
   const format = str(flags, 'format') ?? (ctx.json ? 'json' : 'text');
@@ -102,12 +105,12 @@ async function runValidate(ctx: Ctx, flags: Map<string, string | true>): Promise
   const notes = await readVault(vault);
   const only = codes(str(flags, 'only'));
   const ignore = codes(str(flags, 'ignore')) ?? new Set<string>();
-  const findings = validateVault(notes, {
-    schemaFolder: normalizeFolder(str(flags, 'schema-folder') ?? DEFAULT_SCHEMA_FOLDER),
-    schemaOnly: flags.has('schema-only'),
-    frontmatterEdges: flags.has('frontmatter-edges'),
-    parseYaml,
-  }).filter((f) => (!only || only.has(f.code)) && !ignore.has(f.code));
+  const schemaFolder = normalizeFolder(str(flags, 'schema-folder') ?? DEFAULT_SCHEMA_FOLDER);
+  const noSchema = missingSchema(vault, schemaFolder, 'pass --schema-folder, or --ignore missing-schema for a vault without schemas');
+  const findings = [
+    ...(noSchema === null ? [] : [{ code: MISSING_SCHEMA, severity: severityOf(MISSING_SCHEMA), path: schemaFolder.replace(/\/$/, '') || '.', line: null, message: noSchema }]),
+    ...validateVault(notes, { schemaFolder, schemaOnly: flags.has('schema-only'), frontmatterEdges: flags.has('frontmatter-edges'), parseYaml }),
+  ].filter((f) => (!only || only.has(f.code)) && !ignore.has(f.code));
   const errors = findings.filter((f) => f.severity === 'error').length;
   const warnings = findings.length - errors;
   const failed = errors > 0 || (flags.has('strict') && warnings > 0);

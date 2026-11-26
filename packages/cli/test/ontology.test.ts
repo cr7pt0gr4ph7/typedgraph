@@ -55,8 +55,14 @@ The ontology.
 `,
 };
 
-function decisions(body: string): Record<string, string> {
+/** Docs with a Decision section holding `body`, without an ontology. */
+function bareDecisions(body: string): Record<string, string> {
   return { ...DOCS, 'lat.md/decisions.md': doc('Decision', 'Decisions', `## Regional storage\n\nWe store data in Frankfurt.\n\n${body}`) };
+}
+
+/** The same docs with the ontology in `Types/`, which every graph command needs. */
+function decisions(body: string): Record<string, string> {
+  return { ...ONTOLOGY, ...bareDecisions(body) };
 }
 
 // @tg: verifies:: [[tests/tg-ontology#Typed edges in docs#Decision motivated by a constraint]] {since: "2026-10-14", level: unit}
@@ -110,14 +116,25 @@ it('lists the ontology tg init installs', async () => {
   expect(text.out).toContain('motivated_by: Decision → Constraint|Concept|Decision');
 });
 
-// @tg: verifies:: [[tests/tg-ontology#Ontology listing#No ontology]] {since: "2026-10-14", level: unit}
-// @lat: [[tests/tg-ontology#Ontology listing#No ontology]]
-// @tg: verifies:: [[openspec:tg-cli#Ontology listing#No ontology]]
-it('says when no ontology is declared', async () => {
-  const r = await tg(project(DOCS), ['ontology']);
-  expect(r.code).toBe(0);
-  expect(r.out).toContain('No ontology declared');
-  expect(r.out).toContain('tg init');
+// @tg: verifies:: [[tests/tg-ontology#Ontology listing#Missing schema folder]] {since: "2026-11-26", level: unit}
+// @lat: [[tests/tg-ontology#Ontology listing#Missing schema folder]]
+// @tg: verifies:: [[openspec:tg-cli#Schema folder required#Missing schema folder]]
+// @tg: verifies:: [[openspec:tg-cli#Schema folder required#Schema folder without schema notes]]
+// @tg: verifies:: [[openspec:tg-cli#Schema folder required#Other schema folder named]]
+it('fails when the schema folder is missing or holds no schema notes', async () => {
+  for (const sub of [[], ['check'], ['--json']]) {
+    const r = await tg(project(DOCS), ['ontology', ...sub]);
+    expect(r.code).toBe(2);
+    expect(r.out).toBe('schema folder Types/ not found; run tg init to install the code ontology, or pass --schema-folder\n');
+  }
+  const empty = await tg(project({ ...DOCS, 'Types/README.txt': 'not a schema note' }), ['ontology']);
+  expect(empty.code).toBe(2);
+  expect(empty.out).toContain('schema folder Types/ has no schema notes (*.md)');
+  const other = await tg(project({ ...DOCS, 'Schemas/a.md': '---\nschemas:\n  A: {}\n---\n# A\n' }), ['ontology', '--schema-folder', 'Ontology']);
+  expect(other.code).toBe(2);
+  expect(other.out).toContain('schema folder Ontology/ not found');
+  const cypher = await tg(project(DOCS), ['cypher', '--json', 'MATCH (s:Section) RETURN count(s)']);
+  expect(cypher).toEqual({ code: 2, out: 'schema folder Types/ not found; run tg init to install the code ontology\n' });
 });
 
 // @tg: verifies:: [[tests/tg-ontology#Ontology check#Unknown edge name]] {since: "2026-10-14", level: unit}
@@ -160,7 +177,9 @@ it('passes when every typed edge fits, ignoring references and @lat links', asyn
   const r = await tg(dir, ['ontology', 'check']);
   expect(r.out).toContain('All typed edges agree with the ontology');
   expect(r.code).toBe(0);
-  expect((await tg(project(decisions('- madeUp:: [[constraints#GDPR]]\n')), ['ontology', 'check'])).out).toContain('No ontology declared');
+  const bare = await tg(project(bareDecisions('- madeUp:: [[constraints#GDPR]]\n')), ['ontology', 'check']);
+  expect(bare.code).toBe(2);
+  expect(bare.out).toContain('schema folder Types/ not found');
 });
 
 // @tg: verifies:: [[tests/tg-ontology#Ontology-aware guidance#Instructions teach the ontology]] {since: "2026-10-14", level: unit}

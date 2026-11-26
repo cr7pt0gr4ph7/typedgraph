@@ -2,6 +2,17 @@
 
 All notable changes to the Typed Graph plugin, the `tg` CLI, the core library and the sidecar. The VS Code extension keeps its own [changelog](packages/vscode/CHANGELOG.md).
 
+## Unreleased
+
+Commands that read the ontology no longer pass silently when there is none.
+
+### Changed
+
+- **A missing schema folder is an error.** When the schema folder (`Types/`, or `--schema-folder`) is missing, is not a directory or holds no `*.md` schema note, the commands that read it now fail instead of carrying on with an empty ontology. Before, a typo in `--schema-folder`, the wrong working directory or a project without `tg init` looked like a clean result, in CI too.
+  - `tg validate` reports a `missing-schema` finding with severity error on the folder, so it exits 1 even without `--strict`; `--ignore missing-schema` validates a vault that has no schemas on purpose. The finding is in text, JSON and SARIF output, and `--schema-only` reports it too.
+  - `tg ontology`, `tg ontology check`, `tg schema export` and `tg cypher` (and the MCP tools `tg_ontology` and `tg_cypher`) print `schema folder Types/ not found` (or `is not a directory`, or `has no schema notes (*.md)`) with what to do on stderr, write nothing to stdout even with `--json`, and exit 2. `tg schema export` writes no file then.
+  - `tg schema import` is unchanged, since it creates the folder, and so are `tg check` and the other commands that do not read `Types/`.
+
 ## 0.31.0 — 2026-11-24
 
 OpenFlow joins the spec frameworks `tg` traces.
