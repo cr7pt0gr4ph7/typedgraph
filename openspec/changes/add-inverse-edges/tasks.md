@@ -25,3 +25,9 @@
 
 - [x] 5.1 TGS 0.7 in `spec/tgs/` with 0.6 archived, JSON Schema, a conformance example
 - [x] 5.2 lat.md sections and test specs; run `tg check`, `tg ontology check` and `tg trace --gaps`
+
+## 6. Maintaining inverse edges
+
+- [x] 6.1 `planInverseSync` and `applyInverseEdits` in core: add missing ends (heading, end or frontmatter), fix mismatches (`declared` or `last-edited`), mirror deletions on request
+- [x] 6.2 `tg inverses [--write]` with `--placement`, `--heading`, `--winner` and `--deletions`
+- [x] 6.3 Obsidian plugin: a command and an on-save option, with the same choices as settings

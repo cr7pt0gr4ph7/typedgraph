@@ -36,3 +36,26 @@ Validation SHALL check endpoints, edge properties and edge counts on the canonic
 #### Scenario: Endpoints checked in the declared direction
 - **WHEN** a Company writes `hasEmployee:: [[Globex]]` and Globex is a Company
 - **THEN** `wrong-source-type` reports that `worksAt` starts at Person
+
+### Requirement: Maintain inverse edges
+The system SHALL offer to write the missing end of each inverse or symmetric edge into the Markdown note at its other end, with the edge's properties, under a configurable heading (default `Relations`, created when missing), at the end of the note, or as a frontmatter link (without properties), as chosen at run time. When the two ends differ in properties, the end chosen by the `winner` rule SHALL keep its properties and the other end's property block SHALL be rewritten: `declared` picks the end written with the declared name, and `last-edited` picks the end in the more recently modified note. With `deletions: mirror`, a lone end that the `winner` rule finds left over SHALL be removed instead of completed: under `declared`, an end written with the inverse name, and under `last-edited`, an end whose other note was modified after its own. With the default `deletions: keep`, nothing SHALL be removed. Written lines SHALL carry no marker, and a run on a consistent vault SHALL change nothing.
+
+#### Scenario: Missing end written under a heading
+- **WHEN** Ada writes `worksAt:: [[Acme]] {role: engineer}` and Acme's note has no `hasEmployee` line
+- **THEN** `- hasEmployee:: [[Ada]] {role: engineer}` is added under `## Relations` in Acme's note, and a second run changes nothing
+
+#### Scenario: Placement chosen at run time
+- **WHEN** the placement is `end` or `frontmatter`
+- **THEN** the line is appended at the end of the note, or `hasEmployee: "[[Ada]]"` is added to its frontmatter
+
+#### Scenario: Declared direction wins
+- **WHEN** Ada writes `{role: engineer}` and Acme writes `{role: manager}` and the winner is `declared`
+- **THEN** Acme's line is rewritten to `{role: engineer}`
+
+#### Scenario: Last edited wins
+- **WHEN** the same mismatch is synced with winner `last-edited` and Acme's note is newer
+- **THEN** Ada's line is rewritten to `{role: manager}`
+
+#### Scenario: Deletion mirrored
+- **WHEN** Acme writes `hasEmployee:: [[Ada]]`, Ada's note no longer has `worksAt:: [[Acme]]`, and deletions are `mirror` with winner `declared`
+- **THEN** Acme's line is removed

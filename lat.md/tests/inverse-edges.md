@@ -47,6 +47,18 @@ With the ontology, a Cypher pattern with the declared name or the inverse name m
 
 A directed Cypher pattern on a symmetric edge type gets one notice per type, naming the undirected form; undirected patterns get none.
 
+## Missing ends are written
+
+The maintainer adds the missing end of an inverse or symmetric edge to the other note, under a heading, at the end or in frontmatter, limited to given notes, and a second run changes nothing.
+
+## Mismatches are fixed
+
+The losing end's property block is rewritten with the winner's properties, the winner being the declared end or the more recently edited note.
+
+## Deleted edges are mirrored on request
+
+With `deletions: mirror` a lone end found left over (written with the inverse name, or older than its other note) is removed; with `keep` it is completed.
+
 ## Inverse edges survive SHACL
 
 The SHACL export writes `inverseEdge` as `tgs:inverseEdge` on the edge shape, and import and a second export give it back unchanged.

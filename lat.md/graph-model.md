@@ -54,6 +54,8 @@ The [[packages/core/src/graph/graph.ts#Graph]] keeps edges as written. Schema-aw
 
 [[packages/core/src/schema/schema.ts#validateSchemas]] checks endpoints, edge properties and counts on the canonical edges, and counts a node's edges by the name they have at that node ([[packages/core/src/schema/inverse.ts#edgesFrom]]), so an edge written from the other end satisfies a required edge; whether a note may write a name is still checked as written. Displays name an edge from either end with [[packages/core/src/schema/inverse.ts#nameFrom]].
 
+[[packages/core/src/schema/maintain.ts#planInverseSync]] keeps both ends written in Markdown notes. It adds each missing end to the note at the other end, with the edge's properties, under a heading (default `Relations`, created when missing), at the end of the note, or as a frontmatter link that cannot carry properties. It also rewrites the property block of the end that loses a mismatch. The `winner` option is the source of truth: `declared` (the end written with the declared name) or `last-edited` (the end in the more recently modified note). With `deletions: mirror` the same rule decides whether a lone end is new or left over from a deleted edge, and a left-over end is removed. No marker is written, so a run on a consistent vault changes nothing. [[packages/core/src/schema/maintain.ts#applyInverseEdits]] applies a plan and skips an edit whose line has changed since planning.
+
 ## Plain link edges
 
 With the `linkEdges` graph option, every plain wikilink or markdown link to a note in prose becomes an untyped `links_to` edge (sign +1), as OKF consumers read links.
