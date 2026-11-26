@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **The schema folder follows `.tg/config.json`.** New Typed Note, New Child Note and New Sibling Note read types from `schemaFolder` in the workspace's `.tg/config.json`, the same folder the `tg` CLI and the Obsidian plugin use. The file is read again each time, so an edit applies at once. `typegraph.schemaFolder` now defaults to empty; set it to override the config. Without either, the folder is `Types/` as before. A value outside the workspace is refused with a warning.
+
 ## 0.15.0
 
 - **Set up TypeGraph installs the team map skill and the shared core.** The setup flow runs Typed Graph 0.30.0, so it adds the `tg-team` skill (who owns, knows and decided what, and which agent acts for whom) and `Types/core-types.md`, the edge types the code ontology shares with the ontology gallery. The confirmation lists both files.

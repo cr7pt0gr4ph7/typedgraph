@@ -166,3 +166,12 @@ A note of a declared type is planned with its path in the chosen folder, its aut
 ### Luhmann branch from a note
 
 The Luhmann parent of a note is read from its type's id property, a child and a sibling get the next free id, and the template's parent link points back at the note.
+
+### Schema folder from tg config
+
+With `typegraph.schemaFolder` unset or blank, the schema folder is `schemaFolder` from `.tg/config.json`, picked up again after the file is edited, and `Types/` without the file.
+
+### Setting overrides the config
+
+A `typegraph.schemaFolder` the user set wins over the config at its most specific scope; one outside the workspace is refused with a message and the config is used.
+

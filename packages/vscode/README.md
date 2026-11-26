@@ -40,7 +40,7 @@ The backlinks panel and graph view in this extension show what the agent sees.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `typegraph.schemaFolder` | `Types/` | Folder whose notes declare types, used by the New Typed Note commands. |
+| `typegraph.schemaFolder` | empty | Folder whose notes declare types, used by the New Typed Note commands. Empty follows `schemaFolder` in the workspace's `.tg/config.json` (the `tg` CLI's config, re-read on every use), else `Types/`; a value here overrides it. |
 | `typegraph.roots` | `["."]` | Folders, relative to the workspace folder, that form the graph. |
 | `typegraph.ignore` | `["node_modules"]` | Folder names skipped at any depth. Dot folders are always skipped. |
 | `typegraph.fullGraphLimit` | `2000` | Most nodes the Whole project graph draws. |
