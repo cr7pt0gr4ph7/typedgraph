@@ -202,3 +202,10 @@ it('accepts an inverse name in tg ontology check and reports ends that disagree'
   expect(listed.out).toContain('inverse: part_of (Concept → Concept)');
   expect(listed.out).toContain('symmetric: holds in both directions');
 });
+
+// @tg: verifies:: [[tests/inverse-edges#Queries match either name]] {level: integration}
+it('matches an inverse name in tg cypher', async () => {
+  const dir = project(parts(''));
+  const r = await tg(dir, ['cypher', '--json', 'MATCH (w)-[:part_of]->(c) RETURN w.title, c.title']);
+  expect(rows(r.out)).toEqual([['Wheel', 'Car']]);
+});

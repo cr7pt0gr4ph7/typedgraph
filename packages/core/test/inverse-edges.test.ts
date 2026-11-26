@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canonicalView, edgeSemantics, edgesFrom, Graph, nameFrom, readSchemaNote, schemasFromGraph, validateSchemas, type NoteInput } from '../src/index.js';
+import { BuiltinEngine, canonicalView, edgeSemantics, edgesFrom, Graph, nameFrom, readSchemaNote, schemasFromGraph, validateSchemas, type NoteInput } from '../src/index.js';
 
 function vault(notes: NoteInput[]) {
   const paths = new Set(notes.map((n) => n.path));
@@ -156,5 +156,34 @@ describe('validation with inverse edges', () => {
     const o: NoteInput = { ...ontology, frontmatter: { ...ontology.frontmatter, schemas: { Person: { edges: { worksAt: { target: 'Company', required: true } } }, Company: { edges: ['hasEmployee'] } } } };
     const g = vault([o, note('Ada.md', 'Person'), note('Bob.md', 'Person'), note('Acme.md', 'Company', '- hasEmployee:: [[Ada]]')]);
     expect(validateSchemas(g, schemasFromGraph(g, 'Types/')).map((d) => [d.path, d.code])).toEqual([['Bob.md', 'missing-edge']]);
+  });
+});
+
+describe('cypher over inverse edges', () => {
+  const graph = () => vault([ontology, note('Ada.md', 'Person', '- friendsWith:: [[Bob]]'), note('Bob.md', 'Person'), note('Acme.md', 'Company', '- hasEmployee:: [[Ada]] {role: engineer}')]);
+  const run = (g: Graph, q: string) => new BuiltinEngine(g, () => ({ schemas: schemasFromGraph(g, 'Types/') })).run(q).rows;
+
+  // @tg: verifies:: [[tests/inverse-edges#Queries match either name]] {level: unit}
+  it('matches the declared name and the inverse name, whichever was written', () => {
+    const g = graph();
+    expect(run(g, 'MATCH (p:Person)-[r:worksAt]->(c:Company) RETURN p.title, c.title, r.role, type(r)')).toEqual([['Ada', 'Acme', 'engineer', 'worksAt']]);
+    expect(run(g, 'MATCH (c:Company)-[:hasEmployee]->(p) RETURN c.title, p.title')).toEqual([['Acme', 'Ada']]);
+    expect(run(g, 'MATCH (p)<-[:hasEmployee]-(c) RETURN p.title, c.title')).toEqual([['Ada', 'Acme']]);
+    expect(run(g, 'MATCH (p:Person)-[:hasEmployee]->(c) RETURN p.title, c.title')).toEqual([]);
+    expect(run(g, 'MATCH (c)<-[:worksAt]-(p) RETURN c.title, p.title')).toEqual([['Acme', 'Ada']]);
+  });
+
+  // @tg: verifies:: [[tests/inverse-edges#Queries match either name]] {level: unit}
+  it('matches a symmetric edge in both directions', () => {
+    const g = graph();
+    expect(run(g, "MATCH (a {title: 'Bob'})-[:friendsWith]->(b) RETURN b.title")).toEqual([['Ada']]);
+    expect(run(g, "MATCH (a {title: 'Ada'})-[:friendsWith]->(b) RETURN b.title")).toEqual([['Bob']]);
+    expect(run(g, 'MATCH (a)-[:friendsWith]-(b) RETURN count(*)')).toEqual([[2]]);
+  });
+
+  it('keeps queries as before without schemas', () => {
+    const g = graph();
+    expect(new BuiltinEngine(g).run('MATCH ()-[r:hasEmployee]->() RETURN count(r)').rows).toEqual([[1]]);
+    expect(new BuiltinEngine(g).run('MATCH ()-[r:worksAt]->() RETURN count(r)').rows).toEqual([[0]]);
   });
 });

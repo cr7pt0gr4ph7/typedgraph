@@ -39,3 +39,6 @@ Endpoints, edge properties and counts are checked on the declared direction, and
 
 `tg ontology check` accepts an inverse name, checks its ends swapped and reports ends that disagree; `tg ontology` lists inverses.
 
+## Queries match either name
+
+With the ontology, a Cypher pattern with the declared name or the inverse name matches the edge whichever end wrote it, and a symmetric edge matches both ways.

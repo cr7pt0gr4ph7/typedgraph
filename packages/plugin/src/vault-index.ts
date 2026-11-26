@@ -89,7 +89,8 @@ export class VaultIndex {
       },
     );
     this.code = new CodeLayer(app, this.graph, codeMode, codeRoot);
-    this.engine = new BuiltinEngine(this.graph, engineOptions);
+    // The ontology goes with every query, so inverse and symmetric edge types match from either end.
+    this.engine = new BuiltinEngine(this.graph, () => ({ ...engineOptions(), schemas: this.schemas() }));
     this.graph.onChange(() => {
       this.invalidate();
       this.schedule();

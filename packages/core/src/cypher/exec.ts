@@ -1,4 +1,6 @@
-import type { Graph, GraphEdge } from '../graph/graph.js';
+import { Graph, type GraphEdge, type GraphView } from '../graph/graph.js';
+import { buildView, canonicalView, edgeSemantics, isPlain, type EdgeSemantics } from '../schema/inverse.js';
+import type { SchemaSet } from '../schema/schema.js';
 import type { Expr, NodePattern, Pattern, Projection, Query, ReturnItem } from './ast.js';
 import { containsAgg } from './parser.js';
 import { CypherError } from './lexer.js';
@@ -24,6 +26,12 @@ export interface ExecOptions {
   maxPathDepth?: number;
   /** Abort with a timeout error after this many milliseconds. */
   timeoutMs?: number;
+  /**
+   * The ontology: with inverse or symmetric edge types (TGS 0.7) the query runs on the canonical edge
+   * view, an inverse name matches the declared edge the other way round, and a symmetric edge type
+   * matches in both directions.
+   */
+  schemas?: SchemaSet;
 }
 
 export const DEFAULT_MAX_PATH_DEPTH = 10;
@@ -43,8 +51,12 @@ const varExpr = (name: string): Expr => ({ k: 'var', name, line: 0, column: 0 })
 // @tg: implements:: [[openspec:cypher-query#Read-only]]
 // @tg: implements:: [[openspec:cypher-query#Result shape]]
 // @tg: implements:: [[openspec:cypher-query#Supported clauses]]
-export function execute(graph: Graph, q: Query, params: Params = {}, opts: ExecOptions = {}): QueryResult {
-  const ctx = new Ctx(graph, params, opts.maxPathDepth ?? DEFAULT_MAX_PATH_DEPTH, opts.timeoutMs ? Date.now() + opts.timeoutMs : Infinity);
+// @tg: implements:: [[openspec:cypher-query#Inverse and symmetric patterns]]
+export function execute(graph: GraphView, q: Query, params: Params = {}, opts: ExecOptions = {}): QueryResult {
+  const sem = edgeSemantics(opts.schemas);
+  const plain = isPlain(sem);
+  const view = plain ? graph : graph instanceof Graph ? canonicalView(graph, opts.schemas!) : buildView(graph, sem);
+  const ctx = new Ctx(view, params, opts.maxPathDepth ?? DEFAULT_MAX_PATH_DEPTH, opts.timeoutMs ? Date.now() + opts.timeoutMs : Infinity, plain ? null : sem);
   const columns = analyze(q);
   let rows: Env[] = [new Map<string, Value>()];
   let scope: Scope = new Map<string, ColumnKind>();
@@ -335,11 +347,10 @@ function step(ctx: Ctx, env: Env, p: Pattern, ri: number, cur: NodeRef, used: Se
   const rp = p.rels[ri]!;
   if (rp.length) return expand(ctx, env, p, ri, cur, used, trail, done);
   const np = p.nodes[ri + 1]!;
-  for (const [edge, otherId] of ctx.incident(cur.id, rp.dir)) {
+  for (const [edge, otherId] of ctx.typedIncident(cur.id, rp.dir, rp.types)) {
     ctx.tick();
     // openCypher relationship uniqueness within one MATCH clause.
     if (used.has(edge.id)) continue;
-    if (rp.types.length > 0 && !rp.types.includes(edge.type)) continue;
     const boundRel = env.get(rp.var);
     if (boundRel !== undefined && !(boundRel instanceof RelRef && boundRel.id === edge.id)) continue;
     const rel = ctx.rel(edge);
@@ -371,7 +382,7 @@ function expand(ctx: Ctx, env: Env, p: Pattern, ri: number, start: NodeRef, used
   const nodes: NodeRef[] = [];
   const rels: RelRef[] = [];
   const candidates = (id: string) =>
-    ctx.incident(id, rp.dir).filter(([e]) => !used.has(e.id) && (rp.types.length === 0 || rp.types.includes(e.type)));
+    ctx.typedIncident(id, rp.dir, rp.types).filter(([e]) => !used.has(e.id));
 
   const finish = (end: NodeRef) => {
     if (!endOk(ctx, env, np, end)) return;
@@ -436,10 +447,12 @@ class Ctx {
   readonly trails = new Map<Pattern, Trail>();
 
   constructor(
-    readonly graph: Graph,
+    readonly graph: GraphView,
     readonly params: Params,
     readonly maxDepth: number,
     private readonly deadline: number = Infinity,
+    /** Inverse and symmetric edge types; null when the ontology declares none. */
+    private readonly sem: EdgeSemantics | null = null,
   ) {}
 
   private ticks = 0;
@@ -530,6 +543,40 @@ class Ctx {
     if (dir === 'out') return out;
     const seen = new Set(out.map(([e]) => e.id));
     for (const e of this.graph.inEdges(id)) if (!seen.has(e.id)) out.push([e, e.source]);
+    return out;
+  }
+  /**
+   * Relationships a pattern step can take from a node: those of the listed types (any type when
+   * none is listed) in the pattern's direction. An inverse name stands for its declared edge type the
+   * other way round, and an edge of a symmetric type is taken in either direction.
+   */
+  // @tg: implements:: [[openspec:cypher-query#Inverse and symmetric patterns]]
+  typedIncident(id: string, dir: 'out' | 'in' | 'both', types: string[]): [GraphEdge, string][] {
+    const sem = this.sem;
+    if (!sem) return types.length === 0 ? this.incident(id, dir) : this.incident(id, dir).filter(([e]) => types.includes(e.type));
+    const flip = (d: 'out' | 'in' | 'both') => (d === 'out' ? 'in' : d === 'in' ? 'out' : 'both');
+    const out: [GraphEdge, string][] = [];
+    const seen = new Set<string>();
+    const take = (d: 'out' | 'in' | 'both', ok: (type: string) => boolean) => {
+      for (const pair of this.incident(id, d)) {
+        if (!ok(pair[0].type) || seen.has(pair[0].id)) continue;
+        seen.add(pair[0].id);
+        out.push(pair);
+      }
+    };
+    if (types.length === 0) {
+      take(dir, () => true);
+      if (dir !== 'both') take(flip(dir), (t) => sem.symmetric.has(t));
+      return out;
+    }
+    for (const t of types) {
+      const declared = sem.inverseOf.get(t);
+      if (declared) take(flip(dir), (x) => x === declared);
+      else {
+        take(dir, (x) => x === t);
+        if (dir !== 'both' && sem.symmetric.has(t)) take(flip(dir), (x) => x === t);
+      }
+    }
     return out;
   }
   nodeMatches(n: NodeRef, np: NodePattern, env: Env): boolean {
