@@ -259,3 +259,5 @@
 .obsigraph-controls-panel::-webkit-scrollbar, .obsigraph-details::-webkit-scrollbar { width: 10px; background: transparent; }
 .obsigraph-controls-panel::-webkit-scrollbar-thumb, .obsigraph-details::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb-bg, var(--background-modifier-border-hover)); border-radius: 5px; border: 2px solid transparent; background-clip: padding-box; min-height: 30px; }
 .obsigraph-controls-panel::-webkit-scrollbar-thumb:hover, .obsigraph-details::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-active-thumb-bg, var(--text-faint)); background-clip: padding-box; }
+/* Edge-syntax problems in the editor, such as an unquoted [[link]] in a property block */
+.obsigraph-edge-diagnostic { text-decoration: underline wavy var(--text-warning, #e0a030); text-decoration-skip-ink: none; text-underline-offset: 3px; }

@@ -48,6 +48,10 @@ The system SHALL keep the edge when its property block is malformed, SHALL ignor
 - **WHEN** a note contains `knows:: [[Bob]] {since: 2020`
 - **THEN** the edge `knows` to `Bob` exists with no properties and a diagnostic is reported for that line
 
+#### Scenario: Underlined in the editor
+- **WHEN** a note open in the Obsidian editor holds a malformed property block
+- **THEN** the plugin underlines the place the block stops parsing, to the end of the line, with a wavy line whose hover text is the finding
+
 ### Requirement: Non-edge text is ignored
 The system SHALL NOT create edges from lines inside fenced code blocks or from lines that do not match the inline edge form.
 
