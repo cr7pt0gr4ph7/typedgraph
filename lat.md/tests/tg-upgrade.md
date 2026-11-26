@@ -1,6 +1,6 @@
 ---
 type: Scenario
-openspec: [tg-upgrade]
+openspec: [tg-upgrade, "tg-agent-integration#Schema folder choice"]
 lat:
   require-code-mention: true
 ---
@@ -55,3 +55,8 @@ A project without any tg setup is told to run `tg init`.
 ### Ontology edits kept
 
 Enrichment adds the missing descriptions, elements and property descriptions, keeps the project's values, comments, own types and body, adds no removed type, sets `tgs` to the bundled version, and a second pass adds nothing.
+
+## Schema folder
+
+`tg upgrade` replaces an outdated `core-types.md` in the configured folder, and `--schema-folder` records a new folder and writes the shared core there but never the project's own `code-types.md`.
+
