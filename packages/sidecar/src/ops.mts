@@ -1,4 +1,4 @@
-import { BuiltinEngine, resultToJson, type Graph, type JsonQueryResult } from '@obsigraph/core';
+import { BuiltinEngine, resultToJson, schemasFromGraph, type Graph, type JsonQueryResult, type SchemaSet } from '@obsigraph/core';
 import { EmbeddingError } from './vectors/provider.mjs';
 import type { Config } from './config.mjs';
 import { BackendUnavailable, type LadybugBackend } from './ladybug/backend.mjs';
@@ -38,9 +38,17 @@ const int = (o: Obj, k: string, def: number, min: number, max: number): number =
 // @lat: [[sidecar#Interfaces]]
 export class Ops {
   readonly engine: BuiltinEngine;
+  private schemaCache: { version: number; set: SchemaSet } | null = null;
 
   constructor(private readonly d: OpsDeps) {
-    this.engine = new BuiltinEngine(d.graph, () => ({ maxPathDepth: d.config.maxPathDepth, timeoutMs: d.config.queryTimeoutMs }));
+    this.engine = new BuiltinEngine(d.graph, () => ({ maxPathDepth: d.config.maxPathDepth, timeoutMs: d.config.queryTimeoutMs, schemas: this.schemas() }));
+  }
+
+  /** The vault's ontology, reread when the graph changes, so inverse and symmetric edge types match from either end. */
+  private schemas(): SchemaSet {
+    const v = this.d.graph.version;
+    if (this.schemaCache?.version !== v) this.schemaCache = { version: v, set: schemasFromGraph(this.d.graph, this.d.config.schemaFolder) };
+    return this.schemaCache.set;
   }
 
   // @tg: implements:: [[openspec:sidecar-mcp-graphrag#Cypher query tool]]

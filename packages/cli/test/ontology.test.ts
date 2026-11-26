@@ -184,3 +184,30 @@ it('asks OpenSpec for Decision sections with motivated_by edges and an ontology 
   expect(TG_RULES.design!.join(' ')).toContain('motivated_by');
   expect(TG_RULES.tasks!.join(' ')).toContain('tg ontology check');
 });
+
+const PARTS = {
+  'lat.md/lat.md': '# Project\n\nIndex.\n\n- [[parts]] — parts\n',
+  'Types/parts.md': '---\ntgs: "0.7"\nedgeTypes:\n  has_part:\n    from: Concept\n    to: Concept\n    inverseEdge: part_of\n    properties:\n      count: number\n  related_to:\n    inverseEdge: related_to\nschemas:\n  Concept: {}\n---\n',
+};
+const parts = (body: string) => ({ ...PARTS, 'lat.md/parts.md': `---\ntype: Concept\n---\n# Parts\n\nThings and their parts.\n\n## Car\n\nA car.\n\n- has_part:: [[parts#Wheel]] {count: 4}\n\n## Wheel\n\nA wheel.\n\n${body}` });
+
+// @tg: verifies:: [[tests/inverse-edges#Ontology check knows inverse names]] {level: unit}
+// @lat: [[tests/inverse-edges#Ontology check knows inverse names]]
+it('accepts an inverse name in tg ontology check and reports ends that disagree', async () => {
+  const ok = await tg(project(parts('- part_of:: [[parts#Car]] {count: 4}\n')), ['ontology', 'check']);
+  expect(ok.out).toContain('All typed edges agree with the ontology');
+  const bad = await tg(project(parts('- part_of:: [[parts#Car]] {count: 3}\n')), ['ontology', 'check', '--json']);
+  const findings = (JSON.parse(bad.out) as { findings: { kind: string; file: string }[] }).findings;
+  expect(findings.map((f) => [f.kind, f.file])).toEqual([['inverse-mismatch', 'lat.md/parts.md']]);
+  const listed = await tg(project(parts('')), ['ontology']);
+  expect(listed.out).toContain('inverse: part_of (Concept → Concept)');
+  expect(listed.out).toContain('symmetric: holds in both directions');
+});
+
+// @tg: verifies:: [[tests/inverse-edges#Queries match either name]] {level: integration}
+// @lat: [[tests/inverse-edges#Queries match either name]]
+it('matches an inverse name in tg cypher', async () => {
+  const dir = project(parts(''));
+  const r = await tg(dir, ['cypher', '--json', 'MATCH (w)-[:part_of]->(c) RETURN w.title, c.title']);
+  expect(rows(r.out)).toEqual([['Wheel', 'Car']]);
+});

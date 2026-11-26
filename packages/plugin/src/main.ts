@@ -12,6 +12,7 @@ import { DiagnosticsModal, registerSchemaCommands } from './schema-commands';
 import { registerTgIcon, TG_ICON } from './icon';
 import { noteScope, obsidianIgnored } from './note-scope';
 import { statusCount, type StatusCount } from './status-count';
+import { OnSaveSync, syncInverseEdges, type SyncFiles, type SyncResult } from './inverse-sync';
 
 /** Pause after the last folder-setting edit before the vault is re-indexed. */
 const REINDEX_DELAY_MS = 800;
@@ -28,6 +29,8 @@ export default class ObsigraphPlugin extends Plugin {
   private counts: StatusCount | null = null;
   private reindexTimer: number | null = null;
   private reindexing: Promise<void> = Promise.resolve();
+  private reindexActive = false;
+  private onSave: OnSaveSync | null = null;
 
   // @tg: implements:: [[openspec:graph-query-block#Block structure]]
   async onload(): Promise<void> {
@@ -64,6 +67,17 @@ export default class ObsigraphPlugin extends Plugin {
     // Obsidian sends no event when its "Excluded files" change, so this applies them on demand.
     this.addCommand({ id: 'reindex-vault', name: 'Re-index vault', callback: () => void this.reindexVault() });
     registerSchemaCommands(this);
+    this.addCommand({ id: 'sync-inverse-edges', name: 'Write missing inverse edges in the vault', callback: () => void this.syncInverses() });
+    this.addCommand({
+      id: 'sync-inverse-edges-note',
+      name: 'Write missing inverse edges of the current note',
+      checkCallback: (checking) => {
+        const file = this.app.workspace.getActiveFile();
+        if (!file || file.extension !== 'md') return false;
+        if (!checking) void this.syncInverses(new Set([file.path]));
+        return true;
+      },
+    });
 
     // lat.md ids such as [[file#Heading#Sub]] are not Obsidian heading links; resolve them with the lat resolver.
     this.registerDomEvent(
@@ -111,6 +125,14 @@ export default class ObsigraphPlugin extends Plugin {
       this.register(this.onStylesChanged(() => counts.update()));
       await this.index.build((done, total) => status.setText(`Typed Graph: indexing ${done}/${total}`));
       counts.update();
+      // Saved notes keep the other ends of their inverse edges written, once the vault is indexed.
+      const onSave = (this.onSave = new OnSaveSync((only) => this.runInverseSync(only), () => Math.max(1000, this.settings.refreshDebounceMs)));
+      this.register(() => onSave.cancel());
+      this.register(
+        this.index.graph.onChange((paths) => {
+          if (this.settings.inverseOnSave && this.index.ready && !this.reindexActive) onSave.changed(paths);
+        }),
+      );
     });
   }
 
@@ -128,10 +150,47 @@ export default class ObsigraphPlugin extends Plugin {
     }
     // One at a time, so two passes never interleave.
     this.reindexing = this.reindexing
-      .then(() => this.index.reindex((done, total) => this.status?.setText(`Typed Graph: re-indexing ${done}/${total}`)))
+      .then(() => {
+        this.reindexActive = true;
+        return this.index.reindex((done, total) => this.status?.setText(`Typed Graph: re-indexing ${done}/${total}`));
+      })
+      .finally(() => {
+        this.reindexActive = false;
+      })
       .then(() => this.counts?.update())
       .catch((e: unknown) => console.error('Typed Graph: re-index failed', e));
     return this.reindexing;
+  }
+
+  /** Notes as the inverse-edge sync reads and writes them. */
+  private syncFiles(): SyncFiles {
+    const { vault } = this.app;
+    return {
+      read: async (p) => {
+        const f = vault.getFileByPath(p);
+        return f ? vault.cachedRead(f) : null;
+      },
+      mtime: (p) => vault.getFileByPath(p)?.stat.mtime ?? null,
+      process: async (p, fn) => {
+        const f = vault.getFileByPath(p);
+        if (f) await vault.process(f, fn);
+      },
+    };
+  }
+
+  private runInverseSync(only?: ReadonlySet<string>): Promise<SyncResult> {
+    return syncInverseEdges(this.index.graph, this.index.schemas(), this.syncFiles(), this.settings, only);
+  }
+
+  /** Write the missing ends of inverse and symmetric edges in the vault, or in the given notes, and say what changed. */
+  // @tg: implements:: [[openspec:schema-notes#Maintain inverse edges]]
+  async syncInverses(only?: ReadonlySet<string>): Promise<void> {
+    if (!this.index.ready) return void new Notice('Typed Graph is still indexing the vault.');
+    if (this.settings.inversePlacement === 'frontmatter' && !this.settings.frontmatterEdges) new Notice('Frontmatter placement needs "Frontmatter links as edges", or the links it writes are not read as edges.');
+    const r = await this.runInverseSync(only);
+    const changes = r.actions.filter((a) => a.kind !== 'skip').length;
+    const skipped = r.actions.length - changes;
+    new Notice(changes || skipped ? `Inverse edges: ${changes} change${changes === 1 ? '' : 's'} in ${r.written.length} note${r.written.length === 1 ? '' : 's'}${skipped ? `, ${skipped} skipped` : ''}.` : 'Every inverse and symmetric edge is written on both ends.');
   }
 
   /** Re-index once folder-setting edits pause. */

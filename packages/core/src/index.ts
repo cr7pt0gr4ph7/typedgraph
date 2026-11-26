@@ -3,7 +3,7 @@ export type { ParsedEdge, Diagnostic, ParseOptions, ParseResult, Sign } from './
 export { parseProps, PropsSyntaxError } from './edges/props.js';
 export type { Props, PropValue } from './edges/props.js';
 export { Graph, isEdgeNote, labelsOf, titleOf } from './graph/graph.js';
-export type { GraphNode, GraphEdge, GraphOptions, NoteInput, NoteOutline, LinkResolver, SubpathResolver } from './graph/graph.js';
+export type { GraphNode, GraphEdge, GraphView, GraphOptions, NoteInput, NoteOutline, LinkResolver, SubpathResolver } from './graph/graph.js';
 export { BuiltinEngine } from './cypher/engine.js';
 export type { QueryEngine } from './cypher/engine.js';
 export { AGGREGATE_FUNCTIONS, BINARY_OPERATORS, CLAUSES, containsAgg, FUNCTIONS, parseQuery, PATTERN_FEATURES, queryConstructs, UNARY_OPERATORS } from './cypher/parser.js';
@@ -53,6 +53,10 @@ export { ELEMENT_LABEL, elementDeclarations, findElementDecl, isElementNode, lat
 export type { ElementNode } from './elements/nodes.js';
 export { checkDocuments, noteDocumentDiagnostics } from './elements/validate.js';
 export type { DocumentFinding, DocumentFindingKind } from './elements/validate.js';
+export { buildView, canonicalType, canonicalView, edgeSemantics, edgesFrom, isPlain, loneEnds, nameFrom, readsFrom, writtenAt } from './schema/inverse.js';
+export type { CanonicalView, EdgeSemantics } from './schema/inverse.js';
+export { applyInverseEdits, DEFAULT_INVERSE_HEADING, formatProps, planInverseSync } from './schema/maintain.js';
+export type { DeletionPolicy, InverseAction, InverseEdit, InversePlacement, InversePlan, InverseSyncOptions, SourceOfTruth } from './schema/maintain.js';
 export { frontmatterClose, splitFrontmatter, toYaml } from './schema/frontmatter.js';
 export {
   compareLuhmann,

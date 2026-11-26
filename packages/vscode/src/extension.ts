@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import * as vscode from 'vscode';
+import { schemasFromGraph } from '@obsigraph/core';
 import { panelRows, type ActiveFile, type BacklinkGroup, type BacklinkItem } from './backlinks';
 import { buildHtml, exportFileName } from './export';
 import { GraphSession, type GraphScope, type SessionView } from './graph-session';
@@ -119,7 +120,7 @@ export function activate(context: vscode.ExtensionContext): void {
       if (n?.kind === 'group') return n.group.items.map((item) => ({ kind: 'item', item, folder: folder.uri.fsPath }));
       if (n) return [];
       if (!index) return [];
-      return panelRows(index, activeFile(), needsSetup(folder.uri.fsPath));
+      return panelRows(index, activeFile(), needsSetup(folder.uri.fsPath), schemasFromGraph(index.graph, schemaFolder()));
     },
   };
 

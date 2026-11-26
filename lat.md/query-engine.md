@@ -27,6 +27,12 @@ Parsed by [[packages/core/src/cypher/parser.ts#parseQuery]] and executed by [[pa
 
 Write clauses fail as read-only. Valid openCypher outside this list fails with kind `unsupported` and a message naming the construct (`... is not supported by the built-in engine`): `UNWIND`, `UNION`, `CALL`, `LOAD CSV`, `USE`, `CASE`, `=~`, list slicing, `shortestPath`, unsupported aggregates and unknown functions, list and pattern comprehensions, map projections (`n {.title}`), pattern predicates (`WHERE (a)-->(b)`) and `EXISTS {}`, `COUNT {}` and `COLLECT {}` subqueries. Only malformed text is a `syntax` error. Errors carry line and column. The message does not point at Ladybug; on `backend: ladybug` such queries run there untranslated (see [[ladybug-mirror#Query translation]]).
 
+## Inverse and symmetric edges
+
+Given the ontology, the built-in engine queries the canonical edge view ([[graph-model#Inverse edges]]), so a relation matches whichever end wrote it.
+
+With `ExecOptions.schemas`, [[packages/core/src/cypher/exec.ts#execute]] runs on [[packages/core/src/schema/inverse.ts#canonicalView]]. A relationship pattern with an inverse name, `(c)-[:hasEmployee]->(p)`, matches the declared `worksAt` edge the other way round, and a directed pattern with a symmetric type matches its edges in both directions. `type(r)`, `startNode(r)` and `endNode(r)` report the declared type and direction. Because a directed pattern on a symmetric type looks as if direction mattered, the result then carries a notice suggesting the undirected form `-[:friendsWith]-`. `tg cypher`, the Obsidian plugin and the sidecar pass the ontology; without one, or without inverse declarations, queries run exactly as before. The Ladybug backend still stores edges as written.
+
 ## Query block
 
 A `graph-query` fenced block holds a header of options followed by the Cypher text.

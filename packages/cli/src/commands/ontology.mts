@@ -1,4 +1,4 @@
-import { buildLatGraph, checkDocuments, DEFAULT_SCHEMA_FOLDER, ELEMENT_LABEL, normalizeFolder, readSchemaNote, schemaSetFromNotes, type ElementSchema, type Graph, type GraphNode, type PropertySchema, type SchemaSet, type SectionSchema } from '@obsigraph/core';
+import { buildLatGraph, canonicalType, canonicalView, checkDocuments, edgeSemantics, isPlain, DEFAULT_SCHEMA_FOLDER, ELEMENT_LABEL, normalizeFolder, readSchemaNote, schemaSetFromNotes, type ElementSchema, type Graph, type GraphNode, type PropertySchema, type SchemaSet, type SectionSchema } from '@obsigraph/core';
 import { EXIT_ERROR, EXIT_FINDINGS, EXIT_OK, register, type Command, type Ctx } from '../cli.mjs';
 import { NoLatDir, Project } from '../project.mjs';
 import { readSchemaNotes } from './schema.mjs';
@@ -79,6 +79,7 @@ function elementLines(list: ElementSchema[], indent: string): string[] {
 
 function declaredEdgeNames(set: SchemaSet): Set<string> {
   const names = new Set(set.edgeTypes.keys());
+  for (const e of set.edgeTypes.values()) if (e.inverseEdge) names.add(e.inverseEdge);
   for (const t of set.schemas.values()) for (const e of t.edges ?? []) names.add(e.type);
   return names;
 }
@@ -105,6 +106,7 @@ export function ontologyJson(set: SchemaSet, folder: string) {
       from: e.from,
       to: e.to,
       description: e.description ?? null,
+      inverseEdge: e.inverseEdge ?? null,
       properties: e.properties.map(propJson),
     })),
     diagnostics: set.diagnostics,
@@ -138,6 +140,7 @@ function runList(ctx: Ctx, set: SchemaSet, folder: string): number {
   out.push('', 'Edge types');
   for (const e of set.edgeTypes.values()) {
     out.push(`  ${e.type}: ${e.from?.join('|') ?? 'any'} → ${e.to?.join('|') ?? 'any'}  (${e.path})`);
+    if (e.inverseEdge) out.push(e.inverseEdge === e.type ? '    symmetric: holds in both directions' : `    inverse: ${e.inverseEdge} (${e.to?.join('|') ?? 'any'} → ${e.from?.join('|') ?? 'any'}), the same edge written from the other end`);
     if (e.description) out.push(`    ${e.description}`);
     if (e.properties.length) out.push(...props(e.properties));
   }
@@ -151,7 +154,7 @@ function runList(ctx: Ctx, set: SchemaSet, folder: string): number {
 }
 
 export interface OntologyFinding {
-  kind: 'unknown-edge' | 'wrong-source' | 'wrong-target' | 'undeclared-property' | 'value-not-allowed' | 'missing-element' | 'too-many-elements' | 'missing-attribute' | 'attribute-value-not-allowed' | 'unclosed-element' | 'missing-section';
+  kind: 'unknown-edge' | 'inverse-mismatch' | 'wrong-source' | 'wrong-target' | 'undeclared-property' | 'value-not-allowed' | 'missing-element' | 'too-many-elements' | 'missing-attribute' | 'attribute-value-not-allowed' | 'unclosed-element' | 'missing-section';
   file: string;
   line: number;
   edge: string;
@@ -196,6 +199,7 @@ function where(graph: Graph, sourceId: string, line: number): { file: string; li
 export function checkOntology(graph: Graph, set: SchemaSet): OntologyFinding[] {
   if (set.schemas.size + set.edgeTypes.size === 0) return [];
   const declared = declaredEdgeNames(set);
+  const sem = edgeSemantics(set);
   const out: OntologyFinding[] = [];
   for (const e of graph.edges()) {
     if (STRUCTURAL.has(e.type)) continue;
@@ -206,12 +210,15 @@ export function checkOntology(graph: Graph, set: SchemaSet): OntologyFinding[] {
       push('unknown-edge', `edge type '${e.type}' is not in the ontology${hint ? `; did you mean '${hint}'?` : ''}`);
       continue;
     }
-    const et = set.edgeTypes.get(e.type);
+    // An inverse name is the declared edge type read from its target: its ends swap.
+    const canonical = canonicalType(e.type, sem);
+    const et = set.edgeTypes.get(canonical.type);
     if (!et) continue;
+    const [starts, ends] = canonical.reversed ? [et.to, et.from] : [et.from, et.to];
     const from = typesOf(graph.node(e.source));
     const to = typesOf(graph.node(e.target));
-    if (et.from && from.length && !from.some((t) => et.from!.includes(t))) push('wrong-source', `'${e.type}' starts at ${et.from.join(' or ')}, not ${from.join(', ')}`);
-    if (et.to && to.length && !to.some((t) => et.to!.includes(t))) push('wrong-target', `'${e.type}' ends at ${et.to.join(' or ')}, not ${to.join(', ')}`);
+    if (starts && from.length && !from.some((t) => starts.includes(t))) push('wrong-source', `'${e.type}' starts at ${starts.join(' or ')}, not ${from.join(', ')}`);
+    if (ends && to.length && !to.some((t) => ends.includes(t))) push('wrong-target', `'${e.type}' ends at ${ends.join(' or ')}, not ${to.join(', ')}`);
     const props = new Map(et.properties.map((p) => [p.name, p]));
     for (const [k, v] of Object.entries(e.props)) {
       if (BUILTIN_PROPS.has(k)) continue;
@@ -223,6 +230,8 @@ export function checkOntology(graph: Graph, set: SchemaSet): OntologyFinding[] {
       if (p.values && !(Array.isArray(v) ? v : [v]).every((x) => p.values!.some((a) => String(a) === String(x)))) push('value-not-allowed', `'${e.type}' property '${k}' is ${show(v)}; allowed: ${p.values.map(show).join(', ')}`);
     }
   }
+  // Both ends of one edge written, and disagreeing.
+  if (!isPlain(sem)) for (const d of canonicalView(graph, set).diagnostics) out.push({ kind: 'inverse-mismatch', ...where(graph, d.path ?? '', d.line), edge: '', message: d.message });
   return out.sort((a, b) => a.file.localeCompare(b.file) || a.line - b.line || a.message.localeCompare(b.message));
 }
 

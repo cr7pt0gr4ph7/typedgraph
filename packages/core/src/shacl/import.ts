@@ -46,7 +46,7 @@ function currentTgs(iri: string): string {
 }
 
 /** Predicates the import understands on a node shape and on a property shape. */
-const NODE_KNOWN = new Set([`${RDF}type`, `${SH}targetClass`, `${SH}name`, `${SH}property`, `${TGS}note`, `${TGS}edgesClosed`, `${TGS}template`, `${TGS}templateBody`, `${TGS}visualization`, `${SH}description`, `${TGS}elements`, `${TGS}sections`]);
+const NODE_KNOWN = new Set([`${RDF}type`, `${SH}targetClass`, `${SH}name`, `${SH}property`, `${TGS}note`, `${TGS}edgesClosed`, `${TGS}template`, `${TGS}templateBody`, `${TGS}visualization`, `${SH}description`, `${TGS}elements`, `${TGS}sections`, `${TGS}inverseEdge`]);
 const PROP_KNOWN = new Set([`${RDF}type`, `${SH}path`, `${SH}name`, `${SH}datatype`, `${SH}nodeKind`, `${SH}class`, `${SH}node`, `${SH}or`, `${SH}minCount`, `${SH}maxCount`, `${SH}defaultValue`, `${SH}in`, `${SH}order`, `${SH}hasValue`, `${TGS}kind`, `${TGS}edge`, `${TGS}default`, `${SH}description`]);
 
 /**
@@ -273,6 +273,8 @@ export function importShacl(turtle: string, opts: ShaclImportOptions = {}): Shac
       style: json(s, `${TGS}visualization`, name),
       note: str(one(s, `${TGS}note`)),
       ...described(one(s, `${SH}description`)),
+      // @tg: implements:: [[openspec:shacl-interop#Inverse edges in SHACL]]
+      ...(one(s, `${TGS}inverseEdge`)?.value ? { inverseEdge: one(s, `${TGS}inverseEdge`)!.value } : {}),
     });
   }
 

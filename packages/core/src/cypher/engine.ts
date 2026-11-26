@@ -1,4 +1,4 @@
-import type { Graph } from '../graph/graph.js';
+import type { GraphView } from '../graph/graph.js';
 import { execute, type ExecOptions, type QueryResult } from './exec.js';
 import { parseQuery } from './parser.js';
 
@@ -12,7 +12,7 @@ export interface QueryEngine {
 // @lat: [[query-engine#Two backends]]
 export class BuiltinEngine implements QueryEngine {
   constructor(
-    private readonly graph: Graph,
+    private readonly graph: GraphView,
     private readonly options: () => ExecOptions = () => ({}),
   ) {}
 

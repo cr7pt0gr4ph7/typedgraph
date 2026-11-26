@@ -45,7 +45,8 @@ export const cypher: Command = {
     try {
       const mode = codeMode(flags.get('code'), ctx.env.TG_CODE);
       const files = mode === 'off' ? [] : project.codeSources();
-      result = new BuiltinEngine(buildLatGraph(project.index(), { code: { mode, files }, specs: project.specIndex(), schemas: project.schemas(), notes: project.noteFiles().map((path) => ({ path, text: project.text(path) ?? '' })), parseYaml }).graph, () => ({ timeoutMs: 10_000 })).run(query);
+      const schemas = project.schemas();
+      result = new BuiltinEngine(buildLatGraph(project.index(), { code: { mode, files }, specs: project.specIndex(), schemas, notes: project.noteFiles().map((path) => ({ path, text: project.text(path) ?? '' })), parseYaml }).graph, () => ({ timeoutMs: 10_000, schemas })).run(query);
     } catch (e) {
       if (e instanceof CypherError) {
         ctx.err(`${e.message}${e.line > 0 ? ` (line ${e.line}, column ${e.column})` : ''}\n`);

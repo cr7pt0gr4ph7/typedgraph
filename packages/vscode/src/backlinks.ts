@@ -1,4 +1,4 @@
-import { titleOf, type Graph, type GraphEdge } from '@obsigraph/core';
+import { edgeSemantics, nameFrom, titleOf, type Graph, type GraphEdge, type SchemaSet } from '@obsigraph/core';
 import type { WorkspaceIndex } from './workspace-index';
 
 export interface BacklinkItem {
@@ -34,7 +34,8 @@ function fromEdge(e: GraphEdge, graph: Graph): BacklinkItem {
 
 /**
  * Typed backlinks for the active file. A note lists incoming edges grouped by
- * type, plus the source files that annotate it; a source file lists the notes
+ * the name they have at the note (with `schemas`, an inverse name: an incoming
+ * `worksAt` is listed as `hasEmployee`), plus the source files that annotate it; a source file lists the notes
  * its annotations point at. Whole-file granularity.
  */
 // @tg: implements:: [[vscode#Backlinks]] {since: "2026-10-04"}
@@ -42,7 +43,8 @@ function fromEdge(e: GraphEdge, graph: Graph): BacklinkItem {
 // @tg: implements:: [[openspec:vscode-extension#Backlinks for source files]]
 // @tg: implements:: [[openspec:vscode-extension#Empty and unsupported states]]
 // @tg: implements:: [[openspec:vscode-extension#Typed backlinks for notes]]
-export function backlinksFor(index: WorkspaceIndex, path: string): Backlinks {
+// @tg: implements:: [[openspec:vscode-extension#Backlinks named from the note's side]]
+export function backlinksFor(index: WorkspaceIndex, path: string, schemas?: SchemaSet): Backlinks {
   const graph = index.graph;
   if (index.isSource(path)) {
     const items: BacklinkItem[] = [];
@@ -58,13 +60,15 @@ export function backlinksFor(index: WorkspaceIndex, path: string): Backlinks {
   }
   if (!index.isNote(path)) return EMPTY;
 
+  const sem = edgeSemantics(schemas);
   const byType = new Map<string, BacklinkItem[]>();
   for (const e of graph.inEdges(path)) {
     // Code-layer edges are shown from the annotation index, with the written link.
     if (!index.isNote(e.source)) continue;
-    const list = byType.get(e.type) ?? [];
+    const name = nameFrom(e, path, sem);
+    const list = byType.get(name) ?? [];
     list.push(fromEdge(e, graph));
-    byType.set(e.type, list);
+    byType.set(name, list);
   }
   const groups: BacklinkGroup[] = [...byType].sort(([a], [b]) => a.localeCompare(b)).map(([title, items]) => ({ title, items: items.sort((a, b) => a.path.localeCompare(b.path) || a.line - b.line) }));
   const code = index.annotationsTargeting(path).map((r): BacklinkItem => ({ path: r.file, line: r.line, label: r.file, sign: null, props: {}, target: r.target }));
@@ -89,13 +93,13 @@ export interface ActiveFile {
  */
 // @tg: implements:: [[openspec:vscode-extension#Empty and unsupported states]]
 // @tg: implements:: [[openspec:vscode-extension#Set up TypeGraph]]
-export function panelRows(index: WorkspaceIndex, file: ActiveFile | null, needsSetup: boolean): PanelRow[] {
+export function panelRows(index: WorkspaceIndex, file: ActiveFile | null, needsSetup: boolean, schemas?: SchemaSet): PanelRow[] {
   if (!file) return needsSetup ? [] : [{ kind: 'message', text: 'Open a markdown or source file.' }];
   const name = file.path.split(/[\\/]/).pop() ?? file.path;
   let rows: PanelRow[];
   if (!file.inWorkspace || !index.accepts(file.path)) rows = [{ kind: 'message', text: `${name} is outside the configured roots (typegraph.roots).` }];
   else {
-    const r = backlinksFor(index, file.path);
+    const r = backlinksFor(index, file.path, schemas);
     rows = r.kind === 'empty' ? [{ kind: 'message', text: `No typed edges for ${name}.` }] : r.groups.map((group) => ({ kind: 'group', group }));
   }
   return needsSetup ? [...rows, { kind: 'setup' }] : rows;

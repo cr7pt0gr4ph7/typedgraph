@@ -11,6 +11,7 @@ import './okf.mjs';
 import './schema.mjs';
 import './trace.mjs';
 import './validate.mjs';
+import './inverses.mjs';
 import './ontology.mjs';
 import './migrate.mjs';
 import './upgrade.mjs';
