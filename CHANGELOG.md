@@ -43,6 +43,10 @@ One schema folder for every command, the CLI's config and the Obsidian plugin.
 
 - **Squiggles for edge syntax in Obsidian.** The editor underlines malformed edge property blocks with a wavy line in source mode and live preview, with the finding as hover text. It does not wait for the vault index.
 
+### Changed
+
+- **An unquoted `[[link]]` in an edge property is a link.** `met_with:: [[Person A]] {location: [[Location B]]}` now gives `location` the string `"[[Location B]]"`, as if it were quoted and as Obsidian highlights it. Before, it was the nested list `[["Location B"]]`. A value counts as a link when it is `[[`, then no bracket or line break, then `]]`. To write a nested list holding one item, use `[[X],]` or `[ [X] ]`. `[[1, 2], [3]]` is still a list of lists.
+
 ## 0.31.0 — 2026-11-24
 
 OpenFlow joins the spec frameworks `tg` traces.

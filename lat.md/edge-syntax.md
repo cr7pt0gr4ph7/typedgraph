@@ -18,6 +18,14 @@ In Obsidian, every edge-syntax problem of the open note, such as a malformed pro
 
 [[packages/plugin/src/edge-diagnostics.ts#edgeDiagnosticsEditorExtension]] draws the underlines. [[packages/plugin/src/edge-diagnostics.ts#editorDiagnostics]] reparses the editor text with [[packages/core/src/edges/parse.ts#parseEdges]] on each change rather than waiting for the vault index, and marks from where the problem starts to the end of its line.
 
+## Links in property values
+
+An unquoted `[[X]]` in a property block is the string `"[[X]]"`, as Obsidian's highlighting suggests, so a nested list holding one item is written `[[X],]` or `[ [X] ]`.
+
+A value counts as a link when [[packages/core/src/edges/props.ts#PROPERTY_LINK]] matches it, the same shape Obsidian highlights: `[[`, then no bracket or line break, then `]]`, so subpaths and aliases count. [[packages/core/src/edges/props.ts#parseProps]] tries it before reading a list, so `[[[A]], [[B]]]` is a list of two links, while `[[X],]`, `[[X] ]` and `[[1, 2], [3]]` are nested lists. The value is only text: nothing resolves it or makes it an edge.
+
+Up to 0.31 the parser read `[[X]]` as the nested list `[["X"]]`. One release warned about it with an `edge-property-link` finding; that warning is gone because the value now means what it looks like.
+
 ## Markdown link targets
 
 A standard markdown link to a note works as an edge target, alone or mixed with wikilinks: `knows:: [Bob](/people/bob.md) {since: 2020}`.
