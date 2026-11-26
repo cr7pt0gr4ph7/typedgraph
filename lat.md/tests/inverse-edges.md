@@ -1,0 +1,41 @@
+---
+type: Scenario
+lat:
+  require-code-mention: true
+---
+# Inverse Edges Tests
+
+Test specifications for inverse and symmetric edge types (TGS 0.7), described in [[graph-model#Inverse edges]].
+
+## Inverse name read
+
+`inverseEdge` is read on an edge type, a symmetric edge type names itself, and a value that is not a name is reported.
+
+## Conflicting inverse names
+
+An inverse name declared as an edge type, or claimed by two edge types, is an `inverse-conflict` and is ignored.
+
+## Inverse name is the same edge
+
+In the canonical view, an edge written with the inverse name is the declared edge turned around, while the graph keeps it as written.
+
+## Both ends merge into one edge
+
+The two written ends of one edge merge into one; differing properties, and an end that denies what the other asserts, are `inverse-mismatch`.
+
+## Symmetric edges hold both ways
+
+A symmetric edge written from both ends is one edge, and each end reads it under the same name.
+
+## Edges read from either end
+
+An edge is named by its type at its declared source and by its inverse name at its declared target.
+
+## Validation reads the declared direction
+
+Endpoints, edge properties and counts are checked on the declared direction, and an edge written from the other end satisfies a required edge.
+
+## Ontology check knows inverse names
+
+`tg ontology check` accepts an inverse name, checks its ends swapped and reports ends that disagree; `tg ontology` lists inverses.
+

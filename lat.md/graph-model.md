@@ -44,6 +44,16 @@ Edges carry a type, optional label, sign, properties, a derived or pinned ID and
 
 Syntax is defined in [[edge-syntax]]. An [[edge-syntax#Edge notes|edge note]] contributes an edge and no node; its edge's `file` names the note that declares it, and [[packages/core/src/graph/graph.ts#Graph#declaredEdges]] lists the edges a file wrote.
 
+## Inverse edges
+
+From TGS 0.7 an edge type may name its reverse direction with `inverseEdge`, so each note writes a relation from its own side; an `inverseEdge` equal to the type's own name makes it symmetric.
+
+`worksAt: {from: Person, to: Company, inverseEdge: hasEmployee}` makes `Acme hasEmployee:: [[Ada]]` another way to write `Ada worksAt:: [[Acme]]`; `friendsWith: {inverseEdge: friendsWith}` makes `A friendsWith B` hold from B too. Only one direction is declared: an inverse name that is also declared as an edge type, or claimed by two edge types, is an `inverse-conflict` and is ignored.
+
+The [[packages/core/src/graph/graph.ts#Graph]] keeps edges as written. Schema-aware readers use the canonical view from [[packages/core/src/schema/inverse.ts#canonicalView]], cached per graph version and schema set. In it every inverse-named edge is the declared edge turned around (with `written` recording what was written), and the two written ends of one edge, paired in written order, merge into one edge that lists the other in `merged`. Two ends with different properties, or one asserting what the other denies, are an `inverse-mismatch`.
+
+[[packages/core/src/schema/schema.ts#validateSchemas]] checks endpoints, edge properties and counts on the canonical edges, and counts a node's edges by the name they have at that node ([[packages/core/src/schema/inverse.ts#edgesFrom]]), so an edge written from the other end satisfies a required edge; whether a note may write a name is still checked as written. Displays name an edge from either end with [[packages/core/src/schema/inverse.ts#nameFrom]].
+
 ## Plain link edges
 
 With the `linkEdges` graph option, every plain wikilink or markdown link to a note in prose becomes an untyped `links_to` edge (sign +1), as OKF consumers read links.

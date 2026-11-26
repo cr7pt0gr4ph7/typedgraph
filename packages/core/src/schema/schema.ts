@@ -1,5 +1,6 @@
 import { markdownTarget, type Diagnostic } from '../edges/parse.js';
-import { titleOf, type Graph } from '../graph/graph.js';
+import { titleOf, type Graph, type GraphNode } from '../graph/graph.js';
+import { canonicalView, edgeSemantics, edgesFrom, isPlain, writtenAt } from './inverse.js';
 import { toYaml } from './frontmatter.js';
 import { ID_KINDS, type IdKind, type IdRule } from './ids.js';
 
@@ -97,6 +98,11 @@ export interface EdgeTypeSchema {
   uri: string | null;
   style: Record<string, unknown> | null;
   description?: string | null;
+  /**
+   * Name of the reverse direction (TGS 0.7): an edge written `B -inverseEdge-> A` is this edge
+   * from A to B. Equal to `type` for a symmetric edge type. Absent when the edge type has none.
+   */
+  inverseEdge?: string;
 }
 
 /** Everything one schema note declares. */
@@ -140,7 +146,7 @@ export const BUILTIN_PREFIXES: Readonly<Record<string, string>> = {
 const IRI_SCHEMES = new Set(['http', 'https', 'urn', 'mailto', 'tag', 'did', 'file']);
 
 const TYPE_KEYS = new Set(['properties', 'edges', 'visualization', 'style', 'uri', 'template', 'id', 'description', 'elements', 'sections']);
-const EDGE_TYPE_KEYS = new Set(['from', 'to', 'properties', 'uri', 'visualization', 'style', 'description']);
+const EDGE_TYPE_KEYS = new Set(['from', 'to', 'properties', 'uri', 'visualization', 'style', 'description', 'inverseEdge']);
 const ELEMENT_KEYS = new Set(['description', 'type', 'required', 'many', 'node', 'attributes', 'elements']);
 
 // @tg: implements:: [[openspec:tgs-spec#Host independence]]
@@ -420,7 +426,17 @@ function readEdgeTypeBlock(type: string, path: string, decl: Record<string, unkn
     uri: readString(decl.uri, '`uri`', diag),
     style: isRecord(vis) ? vis : null,
     ...described(readString(decl.description, '`description`', diag)),
+    ...inverseOf(decl.inverseEdge, diag),
   };
+}
+
+/** `{inverseEdge}` when one is declared, else nothing, so edge types without one read exactly as before TGS 0.7. */
+// @tg: implements:: [[openspec:schema-notes#Inverse edge declarations]]
+function inverseOf(raw: unknown, diag: Diag): { inverseEdge?: string } {
+  if (raw === undefined || raw === null) return {};
+  if (typeof raw === 'string' && /^[^\s\[\]{}:|#]+$/.test(raw.trim())) return { inverseEdge: raw.trim() };
+  diag('`inverseEdge` must be an edge type name');
+  return {};
 }
 
 // @tg: implements:: [[openspec:schema-notes#Property declarations]]
@@ -569,7 +585,32 @@ export function schemaSetFromNotes(notes: SchemaNote[]): SchemaSet {
     check(e.uri, `Edge type '${e.type}'`, e.path);
     for (const p of e.properties) check(p.uri, `Property '${p.name}' of edge type '${e.type}'`, e.path);
   }
+  checkInverses(set);
   return set;
+}
+
+/**
+ * An inverse name is another name of the declaring edge type, so it must not be declared as an edge
+ * type itself, and two edge types must not share one. A conflicting `inverseEdge` is reported as
+ * `inverse-conflict` and dropped, so the edge type reads as having no inverse.
+ */
+// @tg: implements:: [[openspec:schema-notes#Inverse edge declarations]]
+function checkInverses(set: SchemaSet): void {
+  const claimed = new Map<string, EdgeTypeSchema>();
+  const drop = (e: EdgeTypeSchema, message: string) => {
+    set.diagnostics.push({ path: e.path, line: 0, column: 0, message: `Edge type '${e.type}': ${message}; inverseEdge ignored`, code: 'inverse-conflict' });
+    const copy: EdgeTypeSchema = { ...e };
+    delete copy.inverseEdge;
+    set.edgeTypes.set(e.type, copy);
+  };
+  for (const e of [...set.edgeTypes.values()]) {
+    const inv = e.inverseEdge;
+    if (inv === undefined || inv === e.type) continue;
+    const other = set.edgeTypes.get(inv);
+    if (other) drop(e, `inverse '${inv}' is declared as an edge type in ${other.path}; declare one direction only`);
+    else if (claimed.has(inv)) drop(e, `inverse '${inv}' is already the inverse of '${claimed.get(inv)!.type}' (${claimed.get(inv)!.path})`);
+    else claimed.set(inv, e);
+  }
 }
 
 /** Names of the allowed edge types, or null when unrestricted. */
@@ -627,58 +668,70 @@ const show = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v));
 // @tg: implements:: [[openspec:schema-notes#Edge property validation]]
 // @tg: implements:: [[openspec:schema-notes#Required property validation]]
 // @tg: implements:: [[openspec:schema-notes#Value and cardinality validation]]
+// @tg: implements:: [[openspec:schema-notes#Inverse edge validation]]
 export function validateSchemas(graph: Graph, set: SchemaSet): Diagnostic[] {
   const out: Diagnostic[] = [];
   if (set.schemas.size === 0 && set.edgeTypes.size === 0) return out;
   const at = (path: string, line: number, code: string, message: string) => out.push({ path, line, column: 0, message, code });
+  const sem = edgeSemantics(set);
+  // Endpoints, properties and counts are checked on the canonical edges; which names a note may write, on the edges as written.
+  const view = isPlain(sem) ? null : canonicalView(graph, set);
+  if (view) out.push(...view.diagnostics);
   for (const n of graph.nodes()) {
     if (n.stub) continue;
     const labels = n.labels.join(', ');
     const schema = mergeSchemas(n.labels, set.schemas);
-    const outEdges = graph.outEdges(n.id);
-    if (schema) {
-      for (const p of schema.properties) {
-        const v = n.props[p.name];
-        if (!present(v)) {
-          if (p.required) at(n.id, 0, 'missing-property', `Missing required property '${p.name}' for type ${labels}`);
-          continue;
-        }
-        if (!p.many && Array.isArray(v)) at(n.id, 0, 'unexpected-list', `Property '${p.name}' holds a list but is not declared many for type ${labels}`);
-        if (p.values) for (const x of Array.isArray(v) ? v : [v]) if (!inValues(p.values, x)) at(n.id, 0, 'value-not-allowed', `Property '${p.name}' value '${show(x)}' is not one of: ${p.values.map(show).join(', ')}`);
+    if (!schema) continue;
+    for (const p of schema.properties) {
+      const v = n.props[p.name];
+      if (!present(v)) {
+        if (p.required) at(n.id, 0, 'missing-property', `Missing required property '${p.name}' for type ${labels}`);
+        continue;
       }
-      if (schema.edges) {
-        const names = schema.edges.map((r) => r.type);
-        for (const e of outEdges) {
-          if (!names.includes(e.type)) at(e.file ?? n.id, e.line, 'edge-not-allowed', `Edge type '${e.type}' is not allowed for ${labels} (allowed: ${names.join(', ') || 'none'})`);
-        }
-        for (const r of schema.edges) {
-          const own = outEdges.filter((e) => e.type === r.type);
-          if (r.required && own.length === 0) at(n.id, 0, 'missing-edge', `Missing required edge '${r.type}' for type ${labels}`);
-          if (!r.many && own.length > 1) at(own[1]!.file ?? n.id, own[1]!.line, 'too-many-edges', `Edge type '${r.type}' allows one edge for ${labels}, found ${own.length}`);
-        }
-      }
+      if (!p.many && Array.isArray(v)) at(n.id, 0, 'unexpected-list', `Property '${p.name}' holds a list but is not declared many for type ${labels}`);
+      if (p.values) for (const x of Array.isArray(v) ? v : [v]) if (!inValues(p.values, x)) at(n.id, 0, 'value-not-allowed', `Property '${p.name}' value '${show(x)}' is not one of: ${p.values.map(show).join(', ')}`);
     }
-    for (const e of outEdges) {
-      const et = set.edgeTypes.get(e.type);
-      const targets = schema?.edges?.find((r) => r.type === e.type)?.targets ?? et?.to ?? null;
-      if (targets) {
-        const t = graph.node(e.target);
-        if (t && !t.stub && t.labels.length && !t.labels.some((l) => targets.includes(l))) {
-          at(e.file ?? n.id, e.line, 'wrong-target-type', `Edge '${e.type}' expects target type ${targets.join(' or ')}, found ${t.labels.join(', ')}`);
-        }
+    if (!schema.edges) continue;
+    const names = schema.edges.map((r) => r.type);
+    for (const e of graph.outEdges(n.id)) {
+      if (!names.includes(e.type)) at(e.file ?? n.id, e.line, 'edge-not-allowed', `Edge type '${e.type}' is not allowed for ${labels} (allowed: ${names.join(', ') || 'none'})`);
+    }
+    const sides = view ? edgesFrom(view, n.id, sem) : graph.outEdges(n.id).map((e) => ({ name: e.type, edge: e }));
+    for (const r of schema.edges) {
+      const own = sides.filter((x) => x.name === r.type).map((x) => x.edge);
+      if (r.required && own.length === 0) at(n.id, 0, 'missing-edge', `Missing required edge '${r.type}' for type ${labels}`);
+      if (!r.many && own.length > 1) at(writtenAt(own[1]!), own[1]!.line, 'too-many-edges', `Edge type '${r.type}' allows one edge for ${labels}, found ${own.length}`);
+    }
+  }
+  for (const e of (view ?? graph).edges()) {
+    const where = writtenAt(e);
+    if (graph.node(e.written?.reversed ? e.target : e.source)?.stub) continue;
+    const src = graph.node(e.source);
+    const tgt = graph.node(e.target);
+    const et = set.edgeTypes.get(e.type);
+    const rules = (node: GraphNode | undefined) => (node && !node.stub ? mergeSchemas(node.labels, set.schemas)?.edges : null) ?? null;
+    const typed = (node: GraphNode | undefined): node is GraphNode => !!node && !node.stub && node.labels.length > 0;
+    const targets = rules(src)?.find((r) => r.type === e.type)?.targets ?? et?.to ?? null;
+    if (targets && typed(tgt) && !tgt.labels.some((l) => targets.includes(l))) {
+      at(where, e.line, 'wrong-target-type', `Edge '${e.type}' expects target type ${targets.join(' or ')}, found ${tgt.labels.join(', ')}`);
+    }
+    // A type's rule for the inverse name constrains the other end, read from that type.
+    const inv = sem.inverseName.get(e.type);
+    const back = inv ? rules(tgt)?.find((r) => r.type === inv)?.targets : null;
+    if (inv && back && typed(src) && !src.labels.some((l) => back.includes(l))) {
+      at(where, e.line, 'wrong-target-type', `Edge '${inv}' expects target type ${back.join(' or ')}, found ${src.labels.join(', ')}`);
+    }
+    if (!et) continue;
+    if (et.from && src && !src.stub && src.labels.length && !src.labels.some((l) => et.from!.includes(l))) {
+      at(where, e.line, 'wrong-source-type', `Edge '${e.type}' expects source type ${et.from.join(' or ')}, found ${src.labels.join(', ')}`);
+    }
+    for (const p of et.properties) {
+      const v = e.props[p.name];
+      if (!present(v)) {
+        if (p.required) at(where, e.line, 'missing-edge-property', `Missing required property '${p.name}' on edge '${e.type}'`);
+        continue;
       }
-      if (!et) continue;
-      if (et.from && n.labels.length && !n.labels.some((l) => et.from!.includes(l))) {
-        at(e.file ?? n.id, e.line, 'wrong-source-type', `Edge '${e.type}' expects source type ${et.from.join(' or ')}, found ${labels}`);
-      }
-      for (const p of et.properties) {
-        const v = e.props[p.name];
-        if (!present(v)) {
-          if (p.required) at(e.file ?? n.id, e.line, 'missing-edge-property', `Missing required property '${p.name}' on edge '${e.type}'`);
-          continue;
-        }
-        if (p.values) for (const x of Array.isArray(v) ? v : [v]) if (!inValues(p.values, x)) at(e.file ?? n.id, e.line, 'edge-value-not-allowed', `Edge property '${p.name}' value '${show(x)}' is not one of: ${p.values.map(show).join(', ')}`);
-      }
+      if (p.values) for (const x of Array.isArray(v) ? v : [v]) if (!inValues(p.values, x)) at(where, e.line, 'edge-value-not-allowed', `Edge property '${p.name}' value '${show(x)}' is not one of: ${p.values.map(show).join(', ')}`);
     }
   }
   return out;
