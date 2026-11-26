@@ -2,6 +2,7 @@ import {
   BuiltinEngine,
   EmbedIndex,
   Graph,
+  isSchemaPath,
   LatIndex,
   noteFormat,
   noteFrontmatter,
@@ -90,8 +91,10 @@ export class VaultIndex {
     );
     this.code = new CodeLayer(app, this.graph, codeMode, codeRoot);
     this.engine = new BuiltinEngine(this.graph, engineOptions);
-    this.graph.onChange(() => {
-      this.invalidate();
+    this.graph.onChange((paths) => {
+      const schemaChanged = paths.some((p) => isSchemaPath(p, this.schemaFolder()));
+      this.clearCaches();
+      if (schemaChanged && this.ready) this.applyTypeHierarchy();
       this.schedule();
     });
   }
@@ -185,9 +188,20 @@ export class VaultIndex {
   /** Drop cached schemas and styles, e.g. after settings change. */
   // @tg: implements:: [[openspec:schema-notes#Schema changes take effect live]]
   invalidate(): void {
+    this.clearCaches();
+    if (this.ready) this.applyTypeHierarchy();
+  }
+
+  private clearCaches(): void {
     this.schemaCache = null;
     this.diagnosticCache = null;
     this.styleCache = null;
+  }
+
+  /** Give every node the supertypes of its types, so queries and views on a base type find its subtypes' notes. */
+  // @tg: implements:: [[openspec:schema-notes#Base type queries]]
+  private applyTypeHierarchy(): void {
+    this.graph.setTypeHierarchy(this.schemas().supertypes);
   }
 
   /** Index every note in the indexed folders, yielding to the UI between time slices. */
@@ -197,6 +211,7 @@ export class VaultIndex {
     await this.code.load();
     await this.indexFiles(this.noteFiles(), onProgress);
     this.ready = true;
+    this.applyTypeHierarchy();
     this.flush();
   }
 

@@ -4,6 +4,7 @@ export const RDF = BUILTIN_PREFIXES.rdf!;
 export const XSD = BUILTIN_PREFIXES.xsd!;
 export const SH = BUILTIN_PREFIXES.sh!;
 export const TGS = BUILTIN_PREFIXES.tgs!;
+export const RDFS = BUILTIN_PREFIXES.rdfs!;
 
 /** Datatype written for each property kind; `link` uses `sh:nodeKind sh:IRI` instead. */
 // @tg: implements:: [[openspec:shacl-interop#Node type mapping]]

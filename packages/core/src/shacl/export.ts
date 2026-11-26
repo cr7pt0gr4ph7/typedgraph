@@ -1,5 +1,5 @@
 import { compactElements, compactSections, DEFAULT_BASE_IRI, iriOf, TGS_VERSION, type EdgeRule, type PropertySchema, type SchemaSet } from '../schema/schema.js';
-import { KIND_DATATYPE, RDF, SH, TGS, XSD } from './vocab.js';
+import { KIND_DATATYPE, RDF, RDFS, SH, TGS, XSD } from './vocab.js';
 
 export interface ShaclExportOptions {
   /** Base IRI for declarations without a `uri` (default `urn:tgs:`). */
@@ -25,6 +25,7 @@ type Entry = [predicate: string, object: Obj];
 // @tg: implements:: [[openspec:shacl-interop#Node type mapping]]
 // @tg: implements:: [[openspec:shacl-interop#Typed Graph annotations]]
 // @tg: implements:: [[openspec:document-elements#SHACL exchange of descriptions and elements]]
+// @tg: implements:: [[openspec:shacl-interop#Type inheritance in SHACL]]
 export function exportShacl(set: SchemaSet, opts: ShaclExportOptions = {}): string {
   const base = opts.base ?? DEFAULT_BASE_IRI;
   const prefixes = set.prefixes;
@@ -70,7 +71,8 @@ export function exportShacl(set: SchemaSet, opts: ShaclExportOptions = {}): stri
   };
 
   const blocks: string[] = [];
-  for (const t of [...set.schemas.values()].sort((a, b) => cmp(a.type, b.type))) {
+  // A type's own declarations: what it inherits is in its supertypes' shapes, which SHACL applies through `rdfs:subClassOf`.
+  for (const t of [...set.declared.values()].sort((a, b) => cmp(a.type, b.type))) {
     const e: Entry[] = [
       ['a', term(`${SH}NodeShape`)],
       [term(`${SH}targetClass`), typeIri(t.type)],
@@ -78,6 +80,7 @@ export function exportShacl(set: SchemaSet, opts: ShaclExportOptions = {}): stri
       [term(`${TGS}note`), literal(t.path)],
     ];
     if (t.description) e.push([term(`${SH}description`), literal(t.description)]);
+    if (t.abstract) e.push([term(`${TGS}abstract`), 'true']);
     if (t.edges) e.push([term(`${TGS}edgesClosed`), 'true']);
     if (t.template) e.push([term(`${TGS}template`), literal(t.template)]);
     const body = t.bodyIsTemplate ? opts.body?.(t.path)?.trim() : '';
@@ -90,6 +93,7 @@ export function exportShacl(set: SchemaSet, opts: ShaclExportOptions = {}): stri
     for (const p of t.properties) e.push([term(`${SH}property`), propertyShape(p, order++)]);
     for (const r of t.edges ?? []) e.push([term(`${SH}property`), edgeShape(r, order++)]);
     blocks.push(statement(shapeIri(t.type, 'Shape'), e));
+    if (t.is?.length) blocks.push(statement(typeIri(t.type), t.is.map((b): Entry => [term(`${RDFS}subClassOf`), typeIri(b)])));
   }
   for (const et of [...set.edgeTypes.values()].sort((a, b) => cmp(a.type, b.type))) {
     const e: Entry[] = [

@@ -1,7 +1,7 @@
 import { watch, type FSWatcher } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
-import { Graph, pathResolver, type NoteInput } from '@obsigraph/core';
+import { DEFAULT_SCHEMA_FOLDER, Graph, isSchemaPath, pathResolver, schemasFromGraph, type NoteInput } from '@obsigraph/core';
 import type { DataDir } from './data-dir.mjs';
 import { isNotePath, listNotes, parseYaml, readNote } from './vault.mjs';
 
@@ -58,12 +58,14 @@ export class VaultSync {
   private lastReconciled: string[] = [];
   readonly frontmatterErrors = new Map<string, string>();
   private readonly asciidoc: boolean;
+  /** Set once the startup build is done; before that the hierarchy is applied once at the end. */
+  private started = false;
 
   constructor(
     private readonly vaultDir: string,
     private readonly data: DataDir,
     private readonly processors: Processor[] = [],
-    private readonly opts: { debounceMs: number; pollMs: number; linkEdges?: boolean; /** Index `.adoc` notes; on by default. */ asciidoc?: boolean } = { debounceMs: 300, pollMs: 0 },
+    private readonly opts: { debounceMs: number; pollMs: number; linkEdges?: boolean; /** Index `.adoc` notes; on by default. */ asciidoc?: boolean; /** Schema folder whose `is` declarations add supertype labels; default `Types/`. */ schemaFolder?: string } = { debounceMs: 300, pollMs: 0 },
   ) {
     this.asciidoc = opts.asciidoc ?? true;
     this.graph = new Graph(pathResolver(() => this.known), undefined, { linkEdges: opts.linkEdges ?? false, parseYaml });
@@ -115,6 +117,8 @@ export class VaultSync {
     }
     const removed = Object.keys(stored).filter((p) => !next.has(p));
     this.files = next;
+    this.started = true;
+    this.applyTypeHierarchy();
 
     for (const note of changed) for (const p of this.processors) await p.upsert(note, this.graph);
     for (const path of removed) for (const p of this.processors) await p.remove(path, this.graph);
@@ -218,10 +222,21 @@ export class VaultSync {
       if (r.frontmatterError) this.frontmatterErrors.set(path, r.frontmatterError);
       else this.frontmatterErrors.delete(path);
       this.graph.upsertNote(r.note);
+      if (this.started && isSchemaPath(path, this.schemaFolder)) this.applyTypeHierarchy();
       return r;
     } catch {
       return null;
     }
+  }
+
+  private get schemaFolder(): string {
+    return this.opts.schemaFolder ?? DEFAULT_SCHEMA_FOLDER;
+  }
+
+  /** Give every node the supertypes of its types (TGS 0.7 `is`); the mirror picks the new labels up on its next diff. */
+  // @tg: implements:: [[openspec:schema-notes#Base type queries]]
+  private applyTypeHierarchy(): void {
+    this.graph.setTypeHierarchy(schemasFromGraph(this.graph, this.schemaFolder).supertypes);
   }
 
   private persist(): Promise<void> {

@@ -22,6 +22,8 @@ A non-empty frontmatter `title` becomes the node's `title` property; otherwise i
 
 A `types` list adds labels after those from `type`, deduplicated; the [[okf]] export writes it because OKF's `type` is a single string.
 
+The supertypes of those types follow them as labels too ([[graph-model#Type inheritance]]), so a `Person` note also has the label `LegalEntity` when the ontology says `Person` is a `LegalEntity`.
+
 ## Schema notes
 
 A schema note such as `Types/Person.md` declares a type's properties, defaults, allowed edge types and visualization, in the spirit of typed templates.
@@ -30,13 +32,37 @@ Schema notes are optional; the graph works without them. Creating a note from a 
 
 A note directly in the schema folder (setting, default `Types/`) declares types in its frontmatter. `schema:` declares the type named by the note title, with the body as its template; `schemas:` declares any number of types by name, so one note can describe a whole subsystem; `edgeTypes:` declares edge types; `prefixes:` adds CURIE prefixes. All may appear together. From TGS 0.4 every declaration may carry a `description`, and a type may declare the `elements` and `sections` its documents hold ([[elements]]). The format is published as the open [[shacl#Typed Graph Schema]] specification.
 
-A type has `properties` (map, kind shorthand or list; kinds text, number, boolean, date, datetime, link, list; `default`, `required`, `many`, `values`, `uri`), `edges` (absent means unrestricted; a list of types, or a map to target types or `{target, many, required}`), `template` (a link to a template note), `uri` and `visualization` (alias `style`, consumed by visualization config). An edge type has `from`, `to`, `properties`, `uri` and `visualization`. Read by [[packages/core/src/schema/schema.ts#readSchemaNote]] and collected by [[packages/core/src/schema/schema.ts#schemasFromGraph]], where the first declaration by path wins and duplicates are reported.
+A type has `properties` (map, kind shorthand or list; kinds text, number, boolean, date, datetime, link, list; `default`, `required`, `many`, `values`, `uri`), `edges` (absent means unrestricted; a list of types, or a map to target types or `{target, many, required}`), `template` (a link to a template note), `uri`, `visualization` (alias `style`, consumed by visualization config) and, from TGS 0.7, `is` and `abstract` ([[graph-model#Type inheritance]]). An edge type has `from`, `to`, `properties`, `uri` and `visualization`. Read by [[packages/core/src/schema/schema.ts#readSchemaNote]] and collected by [[packages/core/src/schema/schema.ts#schemasFromGraph]], where the first declaration by path wins and duplicates are reported.
 
-Validation is advisory and never removes anything from the graph ([[packages/core/src/schema/schema.ts#validateSchemas]]): required and enum properties, lists in single-valued properties, allowed, required and single edges, edge endpoint types (stubs and untyped notes are skipped) and edge properties. Multi-label notes merge schemas in label order: first property declaration wins, allowed edge rules are unioned. Identifiers are IRIs or CURIEs, with built-in prefixes and a base IRI (`urn:tgs:`) for the rest.
+Validation is advisory and never removes anything from the graph ([[packages/core/src/schema/schema.ts#validateSchemas]]): types written as an abstract type, required and enum properties, lists in single-valued properties, allowed, required and single edges, edge endpoint types (stubs and untyped notes are skipped) and edge properties. Multi-label notes merge schemas in label order: first property declaration wins, allowed edge rules are unioned. Identifiers are IRIs or CURIEs, with built-in prefixes and a base IRI (`urn:tgs:`) for the rest.
 
 A type's `id` key (TGS 0.2) lists the identifiers a new note gets: `uuid`, a time-ordered `uuid7` that sorts as a string, a local `timestamp` (`YYYYMMDDHHmm`) or a branching `luhmann` id (`1`, `1a`, `1a1`, `2`), each stored in its own property, optionally also as a file name prefix, and automatic except Luhmann ids, which are placed under a parent note as a child or sibling or taken as the next top-level number ([[packages/core/src/schema/ids.ts#generateId]], [[packages/core/src/schema/newnote.ts#planNewNote]]).
 
 Templates come from the note a type's `template` links to, else the body of a `schema:` note, else one generated from the schema ([[packages/core/src/schema/schema.ts#chooseTemplate]], [[packages/core/src/schema/schema.ts#renderNoteFromType]]); generated edge lines are empty `- type::` placeholders that create no edges. Template text may use `{{title}}`, `{{date}}`, `{{time}}`, `{{id}}`, `{{<id property>}}` and, under a parent, `{{parent}}`, `{{parent-id}}` and `{{parent-link}}`; a line that names the parent disappears when there is none, and other braces such as edge embeds are untouched. The Obsidian plugin offers all of this through a type menu (ribbon, folder context menu and command), and Luhmann child, sibling and top-level commands; VS Code has the same creation commands ([[vscode#Creating notes]]). Schemas are exchanged with RDF tools through [[shacl]].
+
+## Type inheritance
+
+A type may name the abstract types it is a kind of with `is` (TGS 0.7), and inherits their properties, edges, elements, sections and, as a fallback, template, visualization and ids.
+
+- defines:: [[packages/core/src/schema/schema.ts#resolveInheritance]] {note: "effective types, supertypes and inheritance diagnostics"}
+- defines:: [[packages/core/src/graph/graph.ts#Graph#setTypeHierarchy]] {note: "labels include supertypes"}
+
+`abstract: true` marks a type that exists only to be inherited from and named in queries, edge rules and edge types. Only an abstract type can be a supertype, and a note written with an abstract type is an `abstract-type` error. A family that needs a concrete member gets one more subtype (`GeneralLegalEntity`).
+
+`schemaSetFromNotes` resolves the hierarchy. `SchemaSet.schemas` holds each type's effective declaration: its own properties first, then each supertype's in `is` order, with edges, elements and sections merged like a multi-label node's. `SchemaSet.declared` holds the types as written, and `SchemaSet.supertypes` holds each type's supertypes, nearest first. `uri` and `description` are never inherited. An inherited template resolves from the note that declares it (`TypeSchema.templateNote`).
+
+These are errors in [[cli#Commands|tg validate]] and the plugin's list, and the bad supertype is ignored:
+- `unknown-base-type`, `base-not-abstract` and `inheritance-cycle`, for a supertype that cannot be used.
+- `property-conflict`, when the same property name has different kinds.
+
+`Graph.setTypeHierarchy` gives every node the supertypes of its written labels, and relabels nodes when the hierarchy changes. `Graph.writtenLabels` keeps the labels as written. So Cypher, the [[ladybug-mirror]], edge endpoint checks and styles match `LegalEntity` on `Person` and `Company` notes without knowing the hierarchy.
+
+These apply the hierarchy:
+- `buildLatGraph`, when it is given the ontology.
+- `tg validate`.
+- The Obsidian index and the sidecar, whenever a schema note changes.
+
+`validateSchemas` also expands labels from the schema set, so its diagnostics are right on any graph. The choice of inferred labels over query rewriting is [[architecture#Inferred supertype labels]].
 
 ## Edges
 

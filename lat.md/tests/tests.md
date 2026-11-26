@@ -14,6 +14,7 @@ Test specifications whose leaf sections must each be referenced by exactly one `
 - [[graph-query-block]] — block pipeline behaviors from the graph-query-block spec
 - [[graph-view]] — view-state behaviors from the graph-view spec
 - [[schema-notes]] — schema behaviors from the schema-notes spec
+- [[type-inheritance]] — `is` and `abstract`: inherited declarations, supertype labels, diagnostics and SHACL
 - [[visualization-config]] — style precedence behaviors from the visualization-config spec
 - [[edge-embeds]] — embed behaviors from the edge-embeds spec
 - [[cypher-extensions]] — WITH, OPTIONAL MATCH, paths and aggregation behaviors
