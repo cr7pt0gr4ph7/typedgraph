@@ -116,3 +116,10 @@ Without a declaration the current value's type picks the input: number, boolean,
 
 Entries become frontmatter values: numbers parsed with a named error for bad ones, lists split on commas, enum members keeping their schema type, empty entries stored as empty.
 
+## Property link keeps its note near the edge
+
+A tie pulls a far-off linked note to near the middle of its edge, which it would not reach otherwise, and the connector is drawn dashed in the muted colour from an anchor that takes no pointer events.
+
+## Property links setting
+
+The display setting behind the Graph view's Property links checkbox is on by default, parses from `propertyLinks=` and is written by "Copy as block options".

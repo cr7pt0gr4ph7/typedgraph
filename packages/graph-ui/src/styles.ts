@@ -66,6 +66,23 @@ export function buildStylesheet(theme: Theme, display?: DisplaySettings): StyleR
     { selector: 'edge.negative', style: { 'target-arrow-shape': 'tee' } },
     { selector: 'node.stub', style: { 'background-opacity': 0.15, 'border-width': 1.5, 'border-style': 'dashed', 'border-color': theme.muted } },
     { selector: ':selected', style: { 'overlay-opacity': 0.15, 'overlay-color': '#4e79a7' } },
+    // Property links: an invisible anchor at the edge's middle and a thin dashed connector to the linked note.
+    { selector: 'node.prop-anchor', style: { width: 1, height: 1, 'background-opacity': 0, 'border-width': 0, label: '', events: 'no' } },
+    {
+      selector: 'edge.prop-link',
+      style: {
+        'curve-style': 'straight',
+        'line-style': 'dashed',
+        'line-color': theme.muted,
+        'target-arrow-color': theme.muted,
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 0.7,
+        'font-style': 'italic',
+        color: theme.muted,
+        width: 1,
+        events: 'no',
+      },
+    },
   ];
   return display ? [...base, ...displayRules(theme, display)] : base;
 }
@@ -77,6 +94,7 @@ function displayRules(theme: Theme, d: DisplaySettings): StyleRule[] {
   const rules: StyleRule[] = [
     { selector: 'node', style: { width: 24 * d.nodeSize, height: 24 * d.nodeSize, 'min-zoomed-font-size': fade } },
     { selector: 'edge', style: { width: 1.5 * d.linkSize, 'min-zoomed-font-size': fade } },
+    { selector: 'edge.prop-link', style: { width: d.linkSize } },
   ];
   if (!d.arrows) rules.push({ selector: 'edge', style: { 'target-arrow-shape': 'none' } }, { selector: 'edge.negative', style: { 'target-arrow-shape': 'none' } });
   if (!d.edgeLabels) rules.push({ selector: 'edge', style: { label: '' } });

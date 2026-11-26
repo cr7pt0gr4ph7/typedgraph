@@ -67,7 +67,7 @@ describe('layout header options', () => {
     expect(bad.value).toEqual({ arrows: false, hide: ['requirement', 'feature'] });
     expect(bad.errors).toEqual([
       "Invalid fade '2' (0-1)",
-      "Unknown display setting 'bogus' (expected arrows, edgeLabels, fade, nodeSize, linkSize, hide)",
+      "Unknown display setting 'bogus' (expected arrows, edgeLabels, propertyLinks, fade, nodeSize, linkSize, hide)",
       "Expected name=value in 'display' but found 'nodeSize'",
     ]);
     expect(parseForces('labelRepel=2').errors).toEqual(["Invalid labelRepel '2' (0-1)"]);
@@ -91,7 +91,7 @@ describe('layout header options', () => {
   // @tg: verifies:: [[openspec:graph-ui#Forces, pinning and controls#Default settings]]
   it('has the documented defaults and formats settings the header can read back', () => {
     expect(DEFAULT_FORCES).toEqual({ center: 0.3, repel: 19.7, link: 0.68, distance: 235, edgeRepel: 0.44, labelRepel: 0.83, pinOnDrag: true });
-    expect(DEFAULT_DISPLAY).toEqual({ arrows: true, edgeLabels: true, fade: 0.12, nodeSize: 0.75, linkSize: 0.5, hide: [] });
+    expect(DEFAULT_DISPLAY).toEqual({ arrows: true, edgeLabels: true, propertyLinks: true, fade: 0.12, nodeSize: 0.75, linkSize: 0.5, hide: [] });
     const s = resolveSettings({ repel: 3 }, { hide: ['a', 'b'], arrows: false });
     const [forces, display] = formatLayoutOptions(s).split('\n').map((l) => l.replace(/^\w+:\s*/, ''));
     expect(parseForces(forces!)).toEqual({ value: s.forces, errors: [] });

@@ -20,6 +20,8 @@ export interface ForceSettings {
 export interface DisplaySettings {
   arrows: boolean;
   edgeLabels: boolean;
+  /** Draw links in edge properties as dashed connectors from the edge to the linked note. */
+  propertyLinks: boolean;
   /** Labels vanish below a zoom level that grows with this, 0-1; 0 keeps them always. */
   fade: number;
   nodeSize: number;
@@ -36,7 +38,7 @@ export interface LayoutSettings {
 export type ControlsMode = 'show' | 'open' | 'hide';
 
 export const DEFAULT_FORCES: ForceSettings = { center: 0.3, repel: 19.7, link: 0.68, distance: 235, edgeRepel: 0.44, labelRepel: 0.83, pinOnDrag: true };
-export const DEFAULT_DISPLAY: DisplaySettings = { arrows: true, edgeLabels: true, fade: 0.12, nodeSize: 0.75, linkSize: 0.5, hide: [] };
+export const DEFAULT_DISPLAY: DisplaySettings = { arrows: true, edgeLabels: true, propertyLinks: true, fade: 0.12, nodeSize: 0.75, linkSize: 0.5, hide: [] };
 
 export const FORCE_RANGES = {
   center: [0, 1],
@@ -66,6 +68,7 @@ const FORCE_SPEC: Record<string, { name: keyof ForceSettings; kind: Kind }> = {
 const DISPLAY_SPEC: Record<string, { name: keyof DisplaySettings; kind: Kind }> = {
   arrows: { name: 'arrows', kind: 'boolean' },
   edgelabels: { name: 'edgeLabels', kind: 'boolean' },
+  propertylinks: { name: 'propertyLinks', kind: 'boolean' },
   fade: { name: 'fade', kind: 'number' },
   nodesize: { name: 'nodeSize', kind: 'number' },
   linksize: { name: 'linkSize', kind: 'number' },
@@ -156,7 +159,7 @@ export function formatLayoutOptions(s: LayoutSettings): string {
   const d = s.display;
   return (
     `forces: center=${n(f.center)}, repel=${n(f.repel)}, link=${n(f.link)}, distance=${Math.round(f.distance)}, edgeRepel=${n(f.edgeRepel)}, labelRepel=${n(f.labelRepel)}, pinOnDrag=${f.pinOnDrag}\n` +
-    `display: arrows=${d.arrows}, edgeLabels=${d.edgeLabels}, fade=${n(d.fade)}, nodeSize=${n(d.nodeSize)}, linkSize=${n(d.linkSize)}` +
+    `display: arrows=${d.arrows}, edgeLabels=${d.edgeLabels}, propertyLinks=${d.propertyLinks}, fade=${n(d.fade)}, nodeSize=${n(d.nodeSize)}, linkSize=${n(d.linkSize)}` +
     (d.hide.length > 0 ? `, hide=${d.hide.join('|')}` : '')
   );
 }

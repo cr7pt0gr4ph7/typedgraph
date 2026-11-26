@@ -25,10 +25,19 @@ export interface SimLink {
   labelWidth: number;
 }
 
+/** A node held near the middle of the edge between `a` and `b`: a property link's target. */
+export interface SimTie {
+  node: SimNode;
+  a: SimNode;
+  b: SimNode;
+}
+
 /** What the host knows about the graph, in the shape `sync` consumes. */
 export interface SimInput {
   nodes: { id: string; labelWidth: number }[];
   links: { source: string; target: string; type: string }[];
+  /** Property links: `node` is pulled towards the middle of the edge from `a` to `b`. */
+  ties?: { node: string; a: string; b: string }[];
 }
 
 /** A label box: node labels hang under the node, edge labels sit at the edge midpoint. */
@@ -70,6 +79,7 @@ export function edgeLabelWidth(type: string): number {
 export class Simulation {
   nodes = new Map<string, SimNode>();
   links: SimLink[] = [];
+  ties: SimTie[] = [];
   /** Remaining heat, 1 after a fresh layout; forces scale with it and the host stops ticking below 0.01. */
   alpha = 0;
   private arr: SimNode[] = [];
@@ -115,6 +125,7 @@ export class Simulation {
       (neighbours.get(l.source) ?? neighbours.set(l.source, []).get(l.source)!).push(l.target);
       (neighbours.get(l.target) ?? neighbours.set(l.target, []).get(l.target)!).push(l.source);
     }
+    for (const t of input.ties ?? []) (neighbours.get(t.node) ?? neighbours.set(t.node, []).get(t.node)!).push(t.a, t.b);
     for (const s of created) {
       const nb = neighbours.get(s.id)?.find((id) => old.has(id));
       const q = nb ? old.get(nb) : undefined;
@@ -144,6 +155,13 @@ export class Simulation {
       this.links.push({ source: a, target: b, type: l.type, labelWidth: edgeLabelWidth(l.type) });
     }
     for (const s of next.values()) if (!s.deg) s.deg = 1;
+    this.ties = [];
+    for (const t of input.ties ?? []) {
+      const node = next.get(t.node);
+      const a = next.get(t.a);
+      const b = next.get(t.b);
+      if (node && a && b && node !== a && node !== b) this.ties.push({ node, a, b });
+    }
     this.nodes = next;
     this.arr = [...next.values()];
     return { fresh };
@@ -262,6 +280,19 @@ export class Simulation {
       t.vy -= dy * f * b;
       s.vx += dx * f * (1 - b);
       s.vy += dy * f * (1 - b);
+    }
+    // A property link is a softer spring from the edge's middle; the edge's ends take half the pull each.
+    for (const { node, a, b } of this.ties) {
+      const dx = node.x - (a.x + b.x) / 2;
+      const dy = node.y - (a.y + b.y) / 2;
+      const d = Math.sqrt(dx * dx + dy * dy) || 1;
+      const f = (((d - L.distance * 0.75) / d) * al * L.link * 0.25) / node.deg;
+      node.vx -= dx * f;
+      node.vy -= dy * f;
+      a.vx += dx * f * 0.5;
+      a.vy += dy * f * 0.5;
+      b.vx += dx * f * 0.5;
+      b.vy += dy * f * 0.5;
     }
     this.edgeRepel(al);
     for (const s of arr) {

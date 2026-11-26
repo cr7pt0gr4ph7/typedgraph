@@ -1,5 +1,5 @@
 import { markdownTarget, type Graph, type GraphEdge, type GraphNode, type ResolvedEdgeStyle, type ResolvedNodeStyle } from '@obsigraph/core';
-import { nodeCaption, nodeElement, type EdgeElement, type GraphElements } from './elements';
+import { nodeCaption, nodeElement, type EdgeElement, type GraphElements, type PropertyLinkElement } from './elements';
 
 /** A node, its incident edges in both directions, and its direct neighbors. */
 // @tg: implements:: [[visualization#Surfaces]] {since: "2026-10-04"}
@@ -74,11 +74,47 @@ function edgeNoteNeighborhood(graph: Graph, path: string): GraphElements {
 export function mergeElements(...sets: GraphElements[]): GraphElements {
   const nodes = new Map<string, GraphElements['nodes'][number]>();
   const edges = new Map<string, EdgeElement>();
+  const links = new Map<string, PropertyLinkElement>();
   for (const s of sets) {
     for (const n of s.nodes) if (!nodes.has(n.id)) nodes.set(n.id, n);
     for (const e of s.edges) if (!edges.has(e.id)) edges.set(e.id, e);
+    for (const l of s.links ?? []) if (!links.has(l.id)) links.set(l.id, l);
   }
-  return { nodes: [...nodes.values()], edges: [...edges.values()] };
+  return { nodes: [...nodes.values()], edges: [...edges.values()], ...(links.size > 0 ? { links: [...links.values()] } : {}) };
+}
+
+/**
+ * Add the links written in the edges' property values: each wikilink or markdown link to a note
+ * becomes a property link from the edge to that note, and a linked note not yet in `g` is added. Only
+ * links that are strings count (`"[[X]]"`, `see [[X]]`); the unquoted `[[X]]` of an inline property
+ * block is a nested list and stays a value. Links resolve from the declaring note, like the
+ * details panel's links; a link to no note or stub, or with a `#subpath`, names its note.
+ */
+// @tg: implements:: [[visualization#Property links]] {since: "2026-11-26"}
+// @tg: implements:: [[openspec:graph-view#Edge property links]] {since: "2026-11-26"}
+export function withPropertyLinks(graph: Graph, g: GraphElements): GraphElements {
+  const nodes = new Map(g.nodes.map((n) => [n.id, n]));
+  const links = new Map<string, PropertyLinkElement>((g.links ?? []).map((l) => [l.id, l]));
+  for (const el of g.edges) {
+    const e = graph.edge(el.id);
+    if (!e) continue;
+    const from = e.file ?? e.source;
+    for (const [key, value] of Object.entries(e.props)) {
+      if (key === 'id') continue;
+      for (const line of valueLines(value, from)) {
+        for (const part of line) {
+          if (!('link' in part)) continue;
+          const target = graph.resolveLink(part.link.target, from);
+          const n = target ? graph.node(target) : undefined;
+          if (!n) continue;
+          const id = `${e.id}\u001f${key}\u001f${n.id}`;
+          if (!links.has(id)) links.set(id, { id, edge: e.id, target: n.id, key });
+          if (!nodes.has(n.id)) nodes.set(n.id, nodeElement(n));
+        }
+      }
+    }
+  }
+  return links.size > 0 ? { nodes: [...nodes.values()], edges: g.edges, links: [...links.values()] } : g;
 }
 
 export interface Details {

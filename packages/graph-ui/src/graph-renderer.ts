@@ -1,5 +1,5 @@
 import cytoscape, { type Core, type ElementDefinition } from 'cytoscape';
-import { sameElementSet, type EdgeElement, type GraphElements, type NodeElement } from './elements';
+import { sameElementSet, type EdgeElement, type GraphElements, type NodeElement, type PropertyLinkElement } from './elements';
 import { buildStylesheet, type Theme } from './styles';
 import type { Styler } from './styler';
 import { resolveSettings, type DisplaySettings, type ForceSettings, type LayoutSettings } from './layout-options';
@@ -58,6 +58,10 @@ export class GraphRenderer {
   readonly cy: Core;
   private styler: Styler;
   private readonly model = new Map<string, NodeElement | EdgeElement>();
+  /** Property links shown, by id; each is drawn from an anchor node that follows its edge's middle. */
+  private readonly propertyLinks = new Map<string, PropertyLinkElement>();
+  /** Anchor node of each edge that has property links, by edge id. */
+  private readonly anchors = new Map<string, cytoscape.NodeSingular>();
   private readonly current: LayoutSettings;
   private readonly sim: Simulation;
   private readonly cyNodes = new Map<string, cytoscape.NodeSingular>();
@@ -95,7 +99,10 @@ export class GraphRenderer {
     });
     this.cy.on('taphold', 'node', (e) => opts.onExpand?.(target(e).id()));
     this.cy.on('cxttap', (e) => this.contextMenu(e));
-    this.cy.on('select', 'node, edge', (e) => opts.onSelect?.({ kind: target(e).isNode() ? 'node' : 'edge', id: target(e).id() }));
+    this.cy.on('select', 'node, edge', (e) => {
+      if (isPropertyLink(target(e))) return;
+      opts.onSelect?.({ kind: target(e).isNode() ? 'node' : 'edge', id: target(e).id() });
+    });
     this.cy.on('unselect', () => {
       if (this.cy.$(':selected').empty()) opts.onSelect?.(null);
     });
@@ -181,6 +188,7 @@ export class GraphRenderer {
   edgeTypes(): EdgeTypeInfo[] {
     const out = new Map<string, EdgeTypeInfo>();
     this.cy.edges().forEach((e) => {
+      if (isPropertyLink(e)) return;
       const type = String(e.data('type'));
       const x = out.get(type) ?? { type, count: 0, color: String(e.data('color') ?? '') };
       x.count++;
@@ -244,9 +252,11 @@ export class GraphRenderer {
    * is refreshed, so live updates keep node positions.
    */
   setElements(g: GraphElements): void {
-    const same = sameElementSet(this.model, g);
+    const same = sameElementSet(new Set([...this.model.keys(), ...this.propertyLinks.keys()]), g);
     this.model.clear();
+    this.propertyLinks.clear();
     for (const x of [...g.nodes, ...g.edges]) this.model.set(x.id, x);
+    for (const l of g.links ?? []) this.propertyLinks.set(l.id, l);
     if (same) {
       this.restyle();
       return;
@@ -262,9 +272,11 @@ export class GraphRenderer {
   // @tg: implements:: [[openspec:graph-view#Click to expand]]
   addElements(g: GraphElements): void {
     const fresh = [...g.nodes, ...g.edges].filter((x) => !this.model.has(x.id));
-    if (fresh.length === 0) return;
+    const links = (g.links ?? []).filter((l) => !this.propertyLinks.has(l.id));
+    if (fresh.length === 0 && links.length === 0) return;
     for (const x of fresh) this.model.set(x.id, x);
-    const added = this.cy.add(this.definitions({ nodes: g.nodes.filter((n) => fresh.includes(n)), edges: g.edges.filter((e) => fresh.includes(e)) }));
+    for (const l of links) this.propertyLinks.set(l.id, l);
+    const added = this.cy.add(this.definitions({ nodes: g.nodes.filter((n) => fresh.includes(n)), edges: g.edges.filter((e) => fresh.includes(e)), links }));
     if (added.nodes().length > 0 || added.edges().length > 0) this.layout();
   }
 
@@ -302,12 +314,22 @@ export class GraphRenderer {
 
   private markTypes(): void {
     const hide = new Set(this.current.display.hide);
+    const showLinks = this.current.display.propertyLinks;
     this.cy.batch(() => {
       this.cy.edges().forEach((e) => {
-        e.toggleClass('type-hidden', hide.has(String(e.data('type'))));
+        if (!isPropertyLink(e)) e.toggleClass('type-hidden', hide.has(String(e.data('type'))));
       });
-      // A node whose edges are all of hidden types goes with them; unconnected and pinned nodes stay.
+      // A property link goes with its edge, and with the Property links toggle.
+      for (const [edgeId, anchor] of this.anchors) {
+        const gone = !showLinks || this.cy.getElementById(edgeId).hasClass('type-hidden');
+        anchor.toggleClass('type-hidden', gone);
+        anchor.connectedEdges().forEach((c) => {
+          c.toggleClass('type-hidden', gone);
+        });
+      }
+      // A node whose edges (and property links) are all hidden goes with them; unconnected and pinned nodes stay.
       this.cy.nodes().forEach((n) => {
+        if (isPropertyLink(n)) return;
         const edges = n.connectedEdges();
         const orphaned = edges.nonempty() && edges.filter('.type-hidden').length === edges.length && !this.isPinned(n.id());
         n.toggleClass('type-hidden', orphaned);
@@ -325,6 +347,7 @@ export class GraphRenderer {
     const t = e.target as cytoscape.SingularElementReturnValue | Core;
     const kind = t === this.cy ? 'background' : (t as cytoscape.SingularElementReturnValue).isNode() ? 'node' : 'edge';
     const ele = kind === 'background' ? null : (t as cytoscape.SingularElementReturnValue);
+    if (ele && isPropertyLink(ele)) return;
     if (!this.opts.onContextMenu) {
       if (ele && kind === 'node') this.opts.onExpand?.(ele.id());
       return;
@@ -349,7 +372,29 @@ export class GraphRenderer {
         data: { id: e.id, source: e.source, target: e.target, type: e.sign < 0 ? `−${e.type}` : e.type, sign: e.sign, ...this.styler.edge(e) },
         classes: e.sign < 0 ? ['negative'] : [],
       })),
+      ...this.linkDefinitions(g),
     ];
+  }
+
+  /** One anchor node per edge with property links, at the edge's middle, and a connector from it to each linked node. */
+  // @tg: implements:: [[openspec:graph-view#Edge property links]] {since: "2026-11-26"}
+  private linkDefinitions(g: GraphElements): ElementDefinition[] {
+    const out: ElementDefinition[] = [];
+    const edges = new Set(this.cy.edges().map((e) => e.id()));
+    for (const e of g.edges) edges.add(e.id);
+    const nodes = new Set(this.cy.nodes().map((n) => n.id()));
+    for (const n of g.nodes) nodes.add(n.id);
+    const anchored = new Set(this.cy.nodes('.prop-anchor').map((n) => String(n.data('edge'))));
+    for (const l of g.links ?? []) {
+      if (!edges.has(l.edge) || !nodes.has(l.target)) continue;
+      const anchor = anchorId(l.edge);
+      if (!anchored.has(l.edge)) {
+        anchored.add(l.edge);
+        out.push({ group: 'nodes', data: { id: anchor, edge: l.edge, label: '', color: '#000', shape: 'ellipse' }, classes: ['prop-anchor'], selectable: false, grabbable: false });
+      }
+      out.push({ group: 'edges', data: { id: l.id, source: anchor, target: l.target, type: l.key, edge: l.edge, color: '#888', line: 'dashed' }, classes: ['prop-link'], selectable: false });
+    }
+    return out;
   }
 
   /**
@@ -358,12 +403,27 @@ export class GraphRenderer {
    */
   private layout(): void {
     this.cyNodes.clear();
-    const nodes = this.cy.nodes().map((n) => {
-      this.cyNodes.set(n.id(), n);
-      return { id: n.id(), labelWidth: nodeLabelWidth(String(n.data('label') ?? '')) };
+    this.anchors.clear();
+    this.cy.nodes('.prop-anchor').forEach((a) => {
+      this.anchors.set(String(a.data('edge')), a);
     });
-    const links = this.cy.edges().map((e) => ({ source: String(e.data('source')), target: String(e.data('target')), type: String(e.data('type') ?? '') }));
-    const { fresh } = this.sim.sync({ nodes, links });
+    const nodes = this.cy
+      .nodes()
+      .not('.prop-anchor')
+      .map((n) => {
+        this.cyNodes.set(n.id(), n as cytoscape.NodeSingular);
+        return { id: n.id(), labelWidth: nodeLabelWidth(String(n.data('label') ?? '')) };
+      });
+    const plain = this.cy.edges().not('.prop-link');
+    const links = plain.map((e) => ({ source: String(e.data('source')), target: String(e.data('target')), type: String(e.data('type') ?? '') }));
+    const ties = this.cy
+      .edges('.prop-link')
+      .map((c) => {
+        const e = this.cy.getElementById(String(c.data('edge')));
+        return e.empty() ? null : { node: String(c.data('target')), a: String(e.data('source')), b: String(e.data('target')) };
+      })
+      .filter((t): t is { node: string; a: string; b: string } => t !== null);
+    const { fresh } = this.sim.sync({ nodes, links, ties });
     this.sim.autoPin(this.opts.layout?.pins?.() ?? []);
     const saved = this.opts.positions;
     const restored = fresh && !!saved && nodes.length > 0 && nodes.every((n) => !!saved[n.id]);
@@ -404,6 +464,15 @@ export class GraphRenderer {
     this.cy.batch(() => {
       for (const s of this.sim.all) if (!s.dragging) this.cyNodes.get(s.id)?.position({ x: s.x, y: s.y });
     });
+    if (this.anchors.size === 0) return;
+    // Anchors follow the middle of their edge, which is only known once the nodes have moved.
+    this.cy.batch(() => {
+      for (const [edgeId, anchor] of this.anchors) {
+        const e = this.cy.getElementById(edgeId);
+        if (e.empty()) continue;
+        anchor.position(edgeMiddle(e as cytoscape.EdgeSingular));
+      }
+    });
   }
 
   private fit(): void {
@@ -418,4 +487,24 @@ export class GraphRenderer {
 
 function isEdge(x: NodeElement | EdgeElement): x is EdgeElement {
   return 'source' in x;
+}
+
+const anchorId = (edge: string) => `\u001fanchor\u001f${edge}`;
+
+/** An anchor node or connector of a property link, as opposed to a note or a graph edge. */
+function isPropertyLink(e: cytoscape.SingularElementReturnValue | cytoscape.SingularElementArgument): boolean {
+  return e.hasClass('prop-anchor') || e.hasClass('prop-link');
+}
+
+/** The middle of a drawn edge: on its curve when Cytoscape has one, else halfway between its ends. */
+function edgeMiddle(e: cytoscape.EdgeSingular): { x: number; y: number } {
+  try {
+    const m = e.midpoint();
+    if (m && Number.isFinite(m.x) && Number.isFinite(m.y)) return { x: m.x, y: m.y };
+  } catch {
+    // No rendered geometry yet, e.g. before the first frame or without a renderer.
+  }
+  const a = e.source().position();
+  const b = e.target().position();
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
 }

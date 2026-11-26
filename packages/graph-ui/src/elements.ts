@@ -17,9 +17,32 @@ export interface EdgeElement {
   sign: 1 | -1;
 }
 
+/**
+ * A link written in an edge's property value, drawn as a dashed connector from the middle of the
+ * edge to the linked note. `key` is the property name and labels the connector.
+ */
+export interface PropertyLinkElement {
+  id: string;
+  /** Id of the edge whose property holds the link. */
+  edge: string;
+  /** Id of the linked node. */
+  target: string;
+  key: string;
+}
+
 export interface GraphElements {
   nodes: NodeElement[];
   edges: EdgeElement[];
+  /** Links in edge properties; only drawn while their edge and target node are drawn. */
+  links?: PropertyLinkElement[];
+}
+
+/** The property links of `g` whose edge and target node are still in `nodes` and `edges`. */
+export function keptLinks(g: GraphElements, nodes: readonly NodeElement[], edges: readonly EdgeElement[]): PropertyLinkElement[] | undefined {
+  if (!g.links) return undefined;
+  const n = new Set(nodes.map((x) => x.id));
+  const e = new Set(edges.map((x) => x.id));
+  return g.links.filter((l) => n.has(l.target) && e.has(l.edge));
 }
 
 /**
@@ -82,7 +105,7 @@ export function toElements(result: QueryResult, lookup: (id: string) => GraphNod
 
 /** True when `g` has exactly the ids already shown, so a refresh can restyle in place. */
 export function sameElementSet(shown: { has(id: string): boolean; size: number }, g: GraphElements): boolean {
-  const ids = [...g.nodes, ...g.edges].map((x) => x.id);
+  const ids = [...g.nodes, ...g.edges, ...(g.links ?? [])].map((x) => x.id);
   return ids.length === shown.size && ids.every((id) => shown.has(id));
 }
 
@@ -99,5 +122,6 @@ const CODE_LABELS = new Set(['CodeFile', 'CodeSymbol']);
 export function excludeCode(g: GraphElements): GraphElements {
   const nodes = g.nodes.filter((n) => !n.labels.some((l) => CODE_LABELS.has(l)));
   const keep = new Set(nodes.map((n) => n.id));
-  return { nodes, edges: g.edges.filter((e) => keep.has(e.source) && keep.has(e.target)) };
+  const edges = g.edges.filter((e) => keep.has(e.source) && keep.has(e.target));
+  return { nodes, edges, ...(g.links ? { links: keptLinks(g, nodes, edges) } : {}) };
 }

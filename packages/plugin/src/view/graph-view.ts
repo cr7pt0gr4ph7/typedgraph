@@ -12,7 +12,7 @@ import { showGraphMenu } from './graph-menu';
 import { themeFrom } from '../render/theme';
 import { renderTable } from '../render/table';
 import { TG_ICON } from '../icon';
-import { edgeDetails, mergeElements, neighborhood, nodeDetails, type Details } from './view-state';
+import { edgeDetails, mergeElements, neighborhood, nodeDetails, withPropertyLinks, type Details } from './view-state';
 import { renderField } from './property-form';
 const SHOW_DETAILS_KEY = 'obsigraph:details-shown';
 
@@ -178,7 +178,8 @@ export class GraphView extends ItemView {
       return;
     }
 
-    const merged = mergeElements(base, ...[...this.expanded].map((id) => neighborhood(graph, id)));
+    // Notes that the shown edges' properties link to join the view, with a connector from each edge.
+    const merged = withPropertyLinks(graph, mergeElements(base, ...[...this.expanded].map((id) => neighborhood(graph, id))));
     this.candidates = applyFilters(merged, new ViewFilters(), this.removed);
     this.shown = applyFilters(merged, this.filters, this.removed);
     const selected = this.selection;

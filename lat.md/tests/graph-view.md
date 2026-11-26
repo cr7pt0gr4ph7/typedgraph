@@ -51,3 +51,10 @@ With a known schema, a node's labels, stub flag, path, style rows and undeclared
 
 A property value splits into text and link parts: one line per list item, aliases and subpaths kept, markdown links resolved against the note, and empty or non-note links left as text.
 
+## Links in edge properties
+
+A quoted link in an edge's property value links the edge to that note and adds the note to the view, an edge note's links resolve from the edge note, and an unquoted `[[X]]`, plain text and links to no note give nothing.
+
+## Property links follow filters
+
+A property link is kept only while its edge and linked note are shown: hiding the note's type or removing an edge end drops it, and merging an expanded neighborhood keeps it.

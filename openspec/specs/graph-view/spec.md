@@ -192,3 +192,22 @@ Option/Alt-clicking a node in the Graph view SHALL expand its neighbors when som
 #### Scenario: Expand then collapse
 - **WHEN** the user Alt-clicks a node with hidden neighbors, then Alt-clicks it again
 - **THEN** the first click shows its neighbors and the second removes those that touch nothing else
+
+### Requirement: Edge property links
+The Graph view SHALL draw every wikilink or markdown link to a note in a string value of a shown edge's properties as a dashed connector from the middle of that edge to the linked note, labeled with the property name, and SHALL add the linked note to the view when it is not shown yet. Links resolve from the note that declares the edge. An unquoted `[[X]]` in an inline property block, which is a nested list rather than a string, SHALL NOT count as a link, and neither SHALL a link that resolves to no note or stub. A connector SHALL be drawn only while its edge and its linked note are shown, SHALL be hidden with its edge's type, and SHALL NOT be selectable on its own. The layout SHALL keep a linked note near the middle of its edge. The graph controls of the Graph view SHALL offer a Property links checkbox, on by default and remembered with the other display settings, that shows or hides the connectors; a note that is only in the view through hidden connectors SHALL be hidden with them unless it is pinned.
+
+#### Scenario: Linked notes join the view
+- **WHEN** the view shows `knows:: [[Bob]] {see: "[[Carol]]", plain: [[Eve]]}` and Carol is not in the view
+- **THEN** Carol is added with a dashed `see` connector from the middle of the `knows` edge to Carol, and Eve is not added
+
+#### Scenario: Connector from the edge
+- **WHEN** the user drags one end of an edge that has a property link
+- **THEN** the connector keeps starting at the middle of the edge, and the linked note settles near it
+
+#### Scenario: Hidden with their ends
+- **WHEN** the linked note is filtered out or removed from the view, or the edge's type is hidden
+- **THEN** the connector is not drawn
+
+#### Scenario: Property links checkbox
+- **WHEN** the user unchecks Property links in the graph controls
+- **THEN** every connector is hidden, notes shown only through them are hidden too, and the choice is remembered the next time the view opens

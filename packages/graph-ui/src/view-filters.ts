@@ -1,4 +1,4 @@
-import type { GraphElements, NodeElement } from './elements';
+import { keptLinks, type GraphElements, type NodeElement } from './elements';
 
 /** Value key of a property that is missing, null, blank or an empty list. */
 export const EMPTY_VALUE = '(empty)';
@@ -111,7 +111,8 @@ export function applyFilters(g: GraphElements, filters: ViewFilters, removed: Re
   if (removed.size === 0 && !filters.active) return g;
   const nodes = g.nodes.filter((n) => !removed.has(n.id) && filters.visible(n));
   const keep = new Set(nodes.map((n) => n.id));
-  return { nodes, edges: g.edges.filter((e) => keep.has(e.source) && keep.has(e.target)) };
+  const edges = g.edges.filter((e) => keep.has(e.source) && keep.has(e.target));
+  return { nodes, edges, ...(g.links ? { links: keptLinks(g, nodes, edges) } : {}) };
 }
 
 /** Distinct nodes joined to `id` by an edge, in either direction, not counting `id` itself. */

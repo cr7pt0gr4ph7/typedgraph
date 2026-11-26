@@ -2,6 +2,13 @@
 
 All notable changes to the Typed Graph plugin, the `tg` CLI, the core library and the sidecar. The VS Code extension keeps its own [changelog](packages/vscode/CHANGELOG.md).
 
+## Unreleased
+
+### Added
+
+- **Links in edge properties in the Graph view.** A link in an edge's property value (`{see: "[[Design]]"}`, or a link in an edge note's frontmatter) is drawn as a dashed connector from the middle of the edge to the linked note, labeled with the property name. The linked note joins the view if it was not shown. Only quoted links count: an unquoted `[[X]]` in an inline property block is a nested list.
+- **Property links checkbox** in the Graph view's graph controls (Display), on by default. It shows or hides the connectors and is remembered with the other display settings, and blocks accept `propertyLinks=` in their `display:` line.
+
 ## 0.31.0 — 2026-11-24
 
 OpenFlow joins the spec frameworks `tg` traces.

@@ -6,7 +6,8 @@ import { DISPLAY_RANGES, FORCE_RANGES, formatLayoutOptions, type ControlsMode, t
  * Gear button and panel over a graph, in the spirit of Obsidian's graph settings: Display, Edge types,
  * Forces and Pins. It only drives the renderer's public settings and pin methods, so it works for inline
  * blocks and the Graph view alike. `hide` adds nothing. The Graph view also passes a `filterHost`, which
- * adds a Node types section to hide types and filter by property values.
+ * adds a Node types section to hide types and filter by property values, and a Property links toggle
+ * for the connectors from edges to the notes their properties link to.
  */
 // @tg: implements:: [[visualization#Forces and pinning]] {since: "2026-10-12"}
 // @lat: [[visualization#Forces and pinning]]
@@ -98,6 +99,8 @@ export function attachGraphControls(renderer: GraphRenderer, mode: ControlsMode,
   const display = section('Display');
   toggle(display, 'Arrows', () => d().arrows, (arrows) => renderer.updateSettings({ display: { arrows } }));
   toggle(display, 'Edge labels', () => d().edgeLabels, (edgeLabels) => renderer.updateSettings({ display: { edgeLabels } }));
+  // Only the Graph view works out links in edge properties, so blocks do not offer the toggle.
+  if (filterHost) toggle(display, 'Property links', () => d().propertyLinks, (propertyLinks) => renderer.updateSettings({ display: { propertyLinks } }));
   slider(display, 'Text fade threshold', DISPLAY_RANGES.fade, 0.01, () => d().fade, (fade) => renderer.updateSettings({ display: { fade } }), two);
   slider(display, 'Node size', DISPLAY_RANGES.nodeSize, 0.05, () => d().nodeSize, (nodeSize) => renderer.updateSettings({ display: { nodeSize } }), two);
   slider(display, 'Link thickness', DISPLAY_RANGES.linkSize, 0.05, () => d().linkSize, (linkSize) => renderer.updateSettings({ display: { linkSize } }), two);
