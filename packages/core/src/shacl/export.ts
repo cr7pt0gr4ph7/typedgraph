@@ -91,6 +91,7 @@ export function exportShacl(set: SchemaSet, opts: ShaclExportOptions = {}): stri
     for (const r of t.edges ?? []) e.push([term(`${SH}property`), edgeShape(r, order++)]);
     blocks.push(statement(shapeIri(t.type, 'Shape'), e));
   }
+  // @tg: implements:: [[openspec:shacl-interop#Inverse edges in SHACL]]
   for (const et of [...set.edgeTypes.values()].sort((a, b) => cmp(a.type, b.type))) {
     const e: Entry[] = [
       ['a', term(`${SH}NodeShape`)],
@@ -98,6 +99,7 @@ export function exportShacl(set: SchemaSet, opts: ShaclExportOptions = {}): stri
       [term(`${TGS}note`), literal(et.path)],
     ];
     if (et.description) e.push([term(`${SH}description`), literal(et.description)]);
+    if (et.inverseEdge) e.push([term(`${TGS}inverseEdge`), literal(et.inverseEdge)]);
     if (et.style) e.push([term(`${TGS}visualization`), literal(stableJson(et.style))]);
     e.push([term(`${SH}property`), [[term(`${SH}path`), term(`${RDF}predicate`)], [term(`${SH}hasValue`), edgeIri(et.type)]]]);
     if (et.from?.length) e.push([term(`${SH}property`), [[term(`${SH}path`), term(`${RDF}subject`)], ...classes(et.from)]]);

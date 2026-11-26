@@ -28,6 +28,11 @@ export function schemaInfo(schema: TypeSchema, all: Iterable<TypeSchema>, edgeTy
   const mine = (list: string[] | null): boolean => !!list && list.some((t) => names.includes(t));
   const declared = new Map<string, EdgeTypeSchema>();
   for (const e of edgeTypes) declared.set(e.type, e);
+  // An inverse name (TGS 0.7) is the declared edge type read from its target: its ends swap.
+  for (const e of [...declared.values()]) {
+    const inv = e.inverseEdge;
+    if (inv && inv !== e.type && !declared.has(inv)) declared.set(inv, { ...e, type: inv, from: e.to, to: e.from });
+  }
 
   const outgoing = new Map<string, { type: string; targets: string[] | null; cardinality: string | null }>();
   for (const r of schema.edges ?? []) outgoing.set(r.type, { type: r.type, targets: r.targets ?? declared.get(r.type)?.to ?? null, cardinality: cardinality(r.required, r.many) });

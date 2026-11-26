@@ -166,6 +166,7 @@ export function compactEdgeType(e: Omit<ImportedEdgeType, 'note'>): Record<strin
   if (e.description) o.description = e.description;
   if (e.from) o.from = e.from.length === 1 ? e.from[0] : e.from;
   if (e.to) o.to = e.to.length === 1 ? e.to[0] : e.to;
+  if (e.inverseEdge) o.inverseEdge = e.inverseEdge;
   if (e.properties.length) o.properties = compactProps(e.properties);
   if (e.style) o.visualization = e.style;
   return o;

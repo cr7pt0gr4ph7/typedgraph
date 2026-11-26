@@ -23,6 +23,24 @@ export interface GraphEdge {
   line: number;
   /** Path of the edge note that declares this edge; absent when `source` wrote it. */
   file?: string;
+  /**
+   * Set only on edges of a canonical view (see `canonicalView`) whose type or direction differs from
+   * what was written: the written type, and whether source and target were swapped.
+   */
+  written?: { type: string; reversed: boolean };
+  /** Set only on edges of a canonical view: ids of the other written edges merged into this one (its inverse side). */
+  merged?: string[];
+}
+
+/** The read side of a graph: what queries, validation and displays need. A `Graph` is one; so is a canonical view of it. */
+export interface GraphView {
+  readonly size: { nodes: number; edges: number };
+  nodes(): IterableIterator<GraphNode>;
+  edges(): IterableIterator<GraphEdge>;
+  node(id: string): GraphNode | undefined;
+  edge(id: string): GraphEdge | undefined;
+  outEdges(nodeId: string): GraphEdge[];
+  inEdges(nodeId: string): GraphEdge[];
 }
 
 /** The parts of a Markdown note a type can declare: its heading texts and its block-level XML elements. */
@@ -69,7 +87,9 @@ interface FileState {
  */
 // @lat: [[graph-model]]
 // @tg: implements:: [[openspec:graph-model#Plain link edges]]
-export class Graph {
+export class Graph implements GraphView {
+  /** Bumped on every change, so derived views know when to rebuild. */
+  private changes = 0;
   private readonly nodeMap = new Map<string, GraphNode>();
   private readonly edgeMap = new Map<string, GraphEdge>();
   private readonly files = new Map<string, FileState>();
@@ -100,6 +120,11 @@ export class Graph {
   /** Headings and XML elements of a Markdown note, or undefined for AsciiDoc notes, edge notes and nodes built without text. */
   outline(path: string): NoteOutline | undefined {
     return this.outlines.get(path);
+  }
+
+  /** A counter that changes whenever the graph does. */
+  get version(): number {
+    return this.changes;
   }
 
   get size(): { nodes: number; edges: number } {
@@ -416,6 +441,7 @@ export class Graph {
   }
 
   private emit(paths: Set<string>): void {
+    this.changes++;
     const list = [...paths];
     for (const fn of this.listeners) fn(list);
   }

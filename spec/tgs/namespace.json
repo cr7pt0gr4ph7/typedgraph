@@ -12,6 +12,7 @@
     { "term": "kind", "on": "property shape", "range": "string", "comment": "\"list\" for a property of kind list, which SHACL cannot distinguish from a text property with many values." },
     { "term": "default", "on": "property shape", "range": "JSON string", "comment": "A non-scalar default value, such as a list, serialized as JSON. Scalar defaults use sh:defaultValue." },
     { "term": "elements", "on": "node shape", "range": "JSON string", "comment": "The type's elements declarations (TGS 0.4) as a JSON literal." },
-    { "term": "sections", "on": "node shape", "range": "JSON string", "comment": "The type's sections declarations (TGS 0.4) as a JSON literal." }
+    { "term": "sections", "on": "node shape", "range": "JSON string", "comment": "The type's sections declarations (TGS 0.4) as a JSON literal." },
+    { "term": "inverseEdge", "on": "edge shape", "range": "string", "comment": "The edge type's inverse name (TGS 0.7): the same edge read from its target. Equal to the edge type's own name for a symmetric edge type." }
   ]
 }

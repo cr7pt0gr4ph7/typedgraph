@@ -21,7 +21,7 @@ export interface VaultFinding {
 }
 
 /** Declaration problems make the schema unusable; everything else is advisory. */
-const ERROR_CODES = new Set(['invalid-declaration', 'unsupported-version', 'duplicate-declaration']);
+const ERROR_CODES = new Set(['invalid-declaration', 'unsupported-version', 'duplicate-declaration', 'inverse-conflict']);
 
 /** Codes whose line always points into the note body, even line 0. */
 const LINE_CODES = new Set(['edge-syntax', 'embed', 'annotation', 'lat-link', 'ambiguous-link', 'adoc-include', 'adoc-visible-edge', 'too-many-elements', 'missing-attribute', 'attribute-value-not-allowed', 'unclosed-element']);
