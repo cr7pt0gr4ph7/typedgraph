@@ -28,6 +28,8 @@ const note = (path: string, type: string, text = ''): NoteInput => ({ path, text
 
 describe('inverse edge declarations', () => {
   // @tg: verifies:: [[tests/inverse-edges#Inverse name read]] {level: unit}
+  // @tg: verifies:: [[openspec:schema-notes#Inverse edge declarations#Inverse name declared]]
+  // @tg: verifies:: [[openspec:schema-notes#Inverse edge declarations#Symmetric edge type declared]]
   it('reads inverseEdge, and a symmetric edge type names itself', () => {
     const n = readSchemaNote(ontology.path, ontology.frontmatter);
     expect(n.diagnostics).toEqual([]);
@@ -45,6 +47,7 @@ describe('inverse edge declarations', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Conflicting inverse names]] {level: unit}
+  // @tg: verifies:: [[openspec:schema-notes#Inverse edge declarations#Inverse name declared twice]]
   it('reports an inverse name that is declared as an edge type, or claimed twice', () => {
     const g = vault([
       { path: 'Types/A.md', text: '', frontmatter: { edgeTypes: { has_part: { inverseEdge: 'part_of' }, part_of: {}, contains: { inverseEdge: 'inside' }, holds: { inverseEdge: 'inside' } } } },
@@ -61,6 +64,7 @@ describe('inverse edge declarations', () => {
 
 describe('canonical edge view', () => {
   // @tg: verifies:: [[tests/inverse-edges#Inverse name is the same edge]] {level: unit}
+  // @tg: verifies:: [[openspec:graph-model#Canonical edge view#Inverse name turned around]]
   it('turns an edge written with the inverse name into the declared edge, reversed', () => {
     const g = vault([ontology, note('Ada.md', 'Person'), note('Acme.md', 'Company', '- hasEmployee:: [[Ada]] {role: engineer}')]);
     const view = canonicalView(g, schemasFromGraph(g, 'Types/'));
@@ -72,6 +76,8 @@ describe('canonical edge view', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Both ends merge into one edge]] {level: unit}
+  // @tg: verifies:: [[openspec:graph-model#Canonical edge view#Both ends merged]]
+  // @tg: verifies:: [[openspec:schema-notes#Inverse edge validation#Ends disagree]]
   it('merges the two written ends of one edge, and reports properties that differ', () => {
     const agree = vault([ontology, note('Ada.md', 'Person', '- worksAt:: [[Acme]] {role: engineer}'), note('Acme.md', 'Company', '- hasEmployee:: [[Ada]] {role: engineer}')]);
     const v1 = canonicalView(agree, schemasFromGraph(agree, 'Types/'));
@@ -95,6 +101,7 @@ describe('canonical edge view', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Symmetric edges hold both ways]] {level: unit}
+  // @tg: verifies:: [[openspec:graph-model#Canonical edge view#Symmetric ends merged]]
   it('merges a symmetric edge written from both ends and reads it from both', () => {
     const g = vault([ontology, note('Ada.md', 'Person', '- friendsWith:: [[Bob]]'), note('Bob.md', 'Person', '- friendsWith:: [[Ada]]'), note('Cy.md', 'Person', '- friendsWith:: [[Ada]]')]);
     const set = schemasFromGraph(g, 'Types/');
@@ -109,6 +116,7 @@ describe('canonical edge view', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Edges read from either end]] {level: unit}
+  // @tg: verifies:: [[openspec:schema-notes#Edges read from either end#Name from each end]]
   it('names an edge from each of its ends', () => {
     const sem = edgeSemantics(schemasFromGraph(vault([ontology]), 'Types/'));
     const e = { type: 'worksAt', source: 'Ada.md', target: 'Acme.md' };
@@ -134,6 +142,7 @@ describe('canonical edge view', () => {
 
 describe('validation with inverse edges', () => {
   // @tg: verifies:: [[tests/inverse-edges#Validation reads the declared direction]] {level: unit}
+  // @tg: verifies:: [[openspec:schema-notes#Inverse edge validation#Endpoints checked in the declared direction]]
   it('checks endpoints, properties and counts on the declared direction', () => {
     const g = vault([
       ontology,
@@ -152,6 +161,7 @@ describe('validation with inverse edges', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Validation reads the declared direction]] {level: unit}
+  // @tg: verifies:: [[openspec:schema-notes#Inverse edge validation#Other end satisfies a required edge]]
   it('lets an edge written from the other end satisfy a required edge', () => {
     const o: NoteInput = { ...ontology, frontmatter: { ...ontology.frontmatter, schemas: { Person: { edges: { worksAt: { target: 'Company', required: true } } }, Company: { edges: ['hasEmployee'] } } } };
     const g = vault([o, note('Ada.md', 'Person'), note('Bob.md', 'Person'), note('Acme.md', 'Company', '- hasEmployee:: [[Ada]]')]);
@@ -164,6 +174,7 @@ describe('cypher over inverse edges', () => {
   const run = (g: Graph, q: string) => new BuiltinEngine(g, () => ({ schemas: schemasFromGraph(g, 'Types/') })).run(q).rows;
 
   // @tg: verifies:: [[tests/inverse-edges#Queries match either name]] {level: unit}
+  // @tg: verifies:: [[openspec:cypher-query#Inverse and symmetric patterns#Inverse name in a pattern]]
   it('matches the declared name and the inverse name, whichever was written', () => {
     const g = graph();
     expect(run(g, 'MATCH (p:Person)-[r:worksAt]->(c:Company) RETURN p.title, c.title, r.role, type(r)')).toEqual([['Ada', 'Acme', 'engineer', 'worksAt']]);
@@ -174,6 +185,7 @@ describe('cypher over inverse edges', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Queries match either name]] {level: unit}
+  // @tg: verifies:: [[openspec:cypher-query#Inverse and symmetric patterns#Symmetric pattern]]
   it('matches a symmetric edge in both directions', () => {
     const g = graph();
     expect(run(g, "MATCH (a {title: 'Bob'})-[:friendsWith]->(b) RETURN b.title")).toEqual([['Ada']]);

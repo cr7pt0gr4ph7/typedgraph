@@ -70,7 +70,7 @@ function declarations(set: SchemaSet) {
       })),
     edgeTypes: [...set.edgeTypes.values()]
       .sort((a, b) => a.type.localeCompare(b.type))
-      .map((e) => ({ name: e.type, note: e.path, iri: iri(e, e.type), from: e.from, to: e.to, properties: props(e.properties), ...(e.description ? { description: e.description } : {}) })),
+      .map((e) => ({ name: e.type, note: e.path, iri: iri(e, e.type), from: e.from, to: e.to, properties: props(e.properties), ...(e.description ? { description: e.description } : {}), ...(e.inverseEdge ? { inverseEdge: e.inverseEdge } : {}) })),
   };
 }
 
@@ -192,15 +192,32 @@ describe('TGS AsciiDoc notes', () => {
   // @tg: verifies:: [[openspec:tgs-spec#TGS 0.6 published#Published 0.6 at typedgraph.org]] {level: unit}
   // @lat: [[tests/tgs-spec#Version 0.6 published at typedgraph.org]]
   it('publishes 0.6 with every identifier under typedgraph.org', () => {
-    const spec = readFileSync(join(SPEC, 'SPEC.md'), 'utf8');
+    const spec = readFileSync(join(SPEC, 'archive/v0.6/SPEC.md'), 'utf8');
     expect(spec).toContain('# Typed Graph Schema (TGS) 0.6');
     expect(spec).toContain('| **This version** | `https://typedgraph.org/spec/tgs/v0.6/` |');
     expect(spec).toContain('| **Namespace** | `https://typedgraph.org/ns/tgs#` (prefix `tgs:`) |');
-    expect(JSON.parse(readFileSync(join(SPEC, 'tgs.schema.json'), 'utf8')).$id).toBe('https://typedgraph.org/spec/tgs/v0.6/tgs.schema.json');
+    expect(JSON.parse(readFileSync(join(SPEC, 'archive/v0.6/tgs.schema.json'), 'utf8')).$id).toBe('https://typedgraph.org/spec/tgs/v0.6/tgs.schema.json');
     expect(TGS_NAMESPACE).toBe('https://typedgraph.org/ns/tgs#');
-    expect(readFileSync(join(__dirname, '../../../site/build-spec.mjs'), 'utf8')).toContain("const VERSION = '0.6'");
     // 0.5 stays as published, with its former addresses.
     expect(readFileSync(join(SPEC, 'archive/v0.5/SPEC.md'), 'utf8')).toContain('`https://volland.github.io/obsigraph/spec/tgs/v0.5/`');
+  });
+
+  // @tg: verifies:: [[openspec:tgs-spec#TGS 0.7 published#0.6 note under 0.7]] {level: unit}
+  // @tg: verifies:: [[tests/inverse-edges#TGS 0.7 published with inverse edges]] {level: unit}
+  it('publishes 0.7 with inverse edges, keeping 0.6 unchanged in the archive', () => {
+    const spec = readFileSync(join(SPEC, 'SPEC.md'), 'utf8');
+    expect(spec).toContain('# Typed Graph Schema (TGS) 0.7');
+    expect(spec).toContain('| **This version** | `https://typedgraph.org/spec/tgs/v0.7/` |');
+    expect(spec).toContain('### 6.1 Inverse and symmetric edge types');
+    expect(JSON.parse(readFileSync(join(SPEC, 'tgs.schema.json'), 'utf8')).$id).toBe('https://typedgraph.org/spec/tgs/v0.7/tgs.schema.json');
+    expect(readFileSync(join(__dirname, '../../../site/build-spec.mjs'), 'utf8')).toContain("const VERSION = '0.7'");
+    expect(readFileSync(join(SPEC, 'archive/v0.6/SPEC.md'), 'utf8')).not.toContain('inverseEdge');
+    // Every 0.6 conformance example reads the same under 0.7.
+    for (const name of readdirSync(join(SPEC, 'archive/v0.6/examples'))) {
+      const set = schemasFromGraph(graphOf(loadVault(join(SPEC, 'archive/v0.6/examples', name, 'vault'))), 'Types/');
+      const expected = JSON.parse(readFileSync(join(SPEC, 'archive/v0.6/examples', name, 'expected.json'), 'utf8')) as { edgeTypes: unknown };
+      expect(declarations(set).edgeTypes, name).toEqual(expected.edgeTypes);
+    }
   });
 
   // @tg: verifies:: [[openspec:tgs-spec#Namespace IRI#Former namespace imported]] {level: unit}

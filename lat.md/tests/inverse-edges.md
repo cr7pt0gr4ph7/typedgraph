@@ -54,3 +54,7 @@ The VS Code backlinks view groups an incoming edge under the name it has at the 
 ## Type details show inverse names
 
 A type's details list an inverse name as an outgoing edge of the declared target type and as an incoming edge of the declared source type.
+
+## TGS 0.7 published with inverse edges
+
+TGS 0.7 documents `inverseEdge`, the JSON Schema and site builder name 0.7, 0.6 stays unchanged in the archive, and every 0.6 example reads the same.

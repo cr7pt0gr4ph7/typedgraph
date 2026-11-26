@@ -1,0 +1,5 @@
+---
+type: Person
+---
+
+- friendsWith:: [[Ada]]

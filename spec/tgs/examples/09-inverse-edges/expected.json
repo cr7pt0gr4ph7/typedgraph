@@ -1,0 +1,131 @@
+{
+  "invalidAgainstJsonSchema": [],
+  "types": [
+    {
+      "name": "Company",
+      "note": "Types/People.md",
+      "iri": "urn:tgs:Company",
+      "properties": [],
+      "edges": [
+        {
+          "type": "hasEmployee",
+          "targets": [
+            "Person"
+          ],
+          "many": true,
+          "required": false
+        }
+      ],
+      "template": null
+    },
+    {
+      "name": "Person",
+      "note": "Types/People.md",
+      "iri": "urn:tgs:Person",
+      "properties": [],
+      "edges": [
+        {
+          "type": "worksAt",
+          "targets": [
+            "Company"
+          ],
+          "many": false,
+          "required": false
+        },
+        {
+          "type": "friendsWith",
+          "targets": [
+            "Person"
+          ],
+          "many": true,
+          "required": false
+        }
+      ],
+      "template": null
+    }
+  ],
+  "edgeTypes": [
+    {
+      "name": "friendsWith",
+      "note": "Types/People.md",
+      "iri": "urn:tgs:friendsWith",
+      "from": [
+        "Person"
+      ],
+      "to": [
+        "Person"
+      ],
+      "properties": [],
+      "inverseEdge": "friendsWith"
+    },
+    {
+      "name": "has_part",
+      "note": "Types/Clash.md",
+      "iri": "urn:tgs:has_part",
+      "from": null,
+      "to": null,
+      "properties": []
+    },
+    {
+      "name": "part_of",
+      "note": "Types/Clash.md",
+      "iri": "urn:tgs:part_of",
+      "from": null,
+      "to": null,
+      "properties": []
+    },
+    {
+      "name": "worksAt",
+      "note": "Types/People.md",
+      "iri": "urn:tgs:worksAt",
+      "from": [
+        "Person"
+      ],
+      "to": [
+        "Company"
+      ],
+      "properties": [
+        {
+          "name": "role",
+          "iri": "urn:tgs:role",
+          "kind": "text",
+          "required": false,
+          "many": false,
+          "values": [
+            "engineer",
+            "manager"
+          ],
+          "default": null
+        }
+      ],
+      "inverseEdge": "hasEmployee"
+    }
+  ],
+  "diagnostics": [
+    {
+      "path": "Acme.md",
+      "line": 5,
+      "diagnostic": "inverse-mismatch"
+    },
+    {
+      "path": "Initech.md",
+      "line": 5,
+      "diagnostic": "too-many-edges"
+    },
+    {
+      "path": "Initech.md",
+      "line": 6,
+      "diagnostic": "wrong-source-type"
+    },
+    {
+      "path": "Initech.md",
+      "line": 6,
+      "diagnostic": "wrong-target-type"
+    },
+    {
+      "path": "Types/Clash.md",
+      "line": null,
+      "diagnostic": "inverse-conflict"
+    }
+  ]
+}

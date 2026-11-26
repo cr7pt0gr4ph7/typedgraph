@@ -2,6 +2,19 @@
 
 All notable changes to the Typed Graph plugin, the `tg` CLI, the core library and the sidecar. The VS Code extension keeps its own [changelog](packages/vscode/CHANGELOG.md).
 
+## Unreleased
+
+Inverse and symmetric edge types: each note can write a relation from its own side (Volland/typedgraph#20).
+
+### Added
+
+- **Typed Graph Schema 0.7.** An edge type can name its reverse direction with `inverseEdge`. With `worksAt: {from: Person, to: Company, inverseEdge: hasEmployee}`, writing `Acme hasEmployee:: [[Ada]]` means `Ada worksAt Acme`, with the same properties. `friendsWith: {inverseEdge: friendsWith}` makes an edge type symmetric. An inverse name that is also declared as an edge type, or that two edge types share, is reported as `inverse-conflict`. TGS 0.6 is archived unchanged. There is a new conformance example `09-inverse-edges`.
+- **Canonical edge view.** `canonicalView(graph, schemas)` turns edges written with an inverse name around and merges the two written ends of one edge. When the two ends disagree on a property, or one denies what the other asserts, it reports `inverse-mismatch`. The graph built from markdown is unchanged.
+- **Validation** checks endpoints, edge properties and edge counts in the declared direction. An edge written from the other end satisfies a required edge. `tg ontology` lists inverse names and symmetric edge types, and `tg ontology check` accepts inverse names and reports `inverse-mismatch`.
+- **Cypher.** In `tg cypher`, the Obsidian plugin and the sidecar's built-in engine, a pattern with an inverse name matches the declared edge the other way round. A symmetric edge type matches in both directions.
+- **SHACL.** `inverseEdge` is exported and imported as `tgs:inverseEdge` on the edge shape.
+- **Displays.** VS Code backlinks group an incoming edge under its name at the open note, so an incoming `worksAt` shows as `hasEmployee`. The plugin's type details list inverse names among a type's edges.
+
 ## 0.31.0 — 2026-11-24
 
 OpenFlow joins the spec frameworks `tg` traces.

@@ -1,18 +1,18 @@
-# Typed Graph Schema (TGS) 0.6
+# Typed Graph Schema (TGS) 0.7
 
 | | |
 |---|---|
-| **Version** | 0.6 (published 2026-11-11; immutable) |
-| **Previous** | [0.5](../v0.5/) |
-| **This version** | `https://typedgraph.org/spec/tgs/v0.6/` |
-| **JSON Schema** | `https://typedgraph.org/spec/tgs/v0.6/tgs.schema.json` |
+| **Version** | 0.7 (published 2026-11-26; immutable) |
+| **Previous** | [0.6](../v0.6/) |
+| **This version** | `https://typedgraph.org/spec/tgs/v0.7/` |
+| **JSON Schema** | `https://typedgraph.org/spec/tgs/v0.7/tgs.schema.json` |
 | **Namespace** | `https://typedgraph.org/ns/tgs#` (prefix `tgs:`) |
 | **Latest version** | `https://typedgraph.org/spec/tgs/` |
 | **Editor** | Volodymyr Pavlyshyn |
 | **Source** | `spec/tgs/` in [github.com/Volland/typedgraph](https://github.com/Volland/typedgraph) |
 | **License** | Text: CC BY 4.0. JSON Schema and examples: MIT. |
 
-TGS describes the types of a knowledge graph kept as markdown or AsciiDoc notes: what properties a note of a type has, which typed links it may have to which other types, what properties those links carry, and what the parts inside a note mean: its headings and the XML elements it contains. Every declaration can explain itself in a `description`, written for people and for AI agents alike. A schema is ordinary YAML frontmatter in ordinary notes, so people can write and review it by hand, and it maps to and from W3C SHACL so the same ontology can be exchanged with RDF tools.
+TGS describes the types of a knowledge graph kept as markdown or AsciiDoc notes: what properties a note of a type has, which typed links it may have to which other types, what properties those links carry, which links are the same relation read from its other end, and what the parts inside a note mean: its headings and the XML elements it contains. Every declaration can explain itself in a `description`, written for people and for AI agents alike. A schema is ordinary YAML frontmatter in ordinary notes, so people can write and review it by hand, and it maps to and from W3C SHACL so the same ontology can be exchanged with RDF tools.
 
 TGS is independent of any one application. Typed Graph (an Obsidian plugin and CLI) is the reference implementation.
 
@@ -396,8 +396,39 @@ An edge type declaration describes an edge type everywhere it is used:
 | `uri` | IRI or CURIE | identifier of the edge type (an RDF predicate); default: base IRI + name |
 | `visualization` | mapping | display hints for edges of this type (section 11); `style` is an alias |
 | `description` | string | what the edge type means (0.4) |
+| `inverseEdge` | edge type name | the name of the same edge read from its target (0.7, section 6.1) |
 
 Undeclared edge properties are allowed. When both a type's `edges` entry and the edge type declare targets, the type's entry wins for sources of that type.
+
+### 6.1 Inverse and symmetric edge types
+
+An edge type MAY name its reverse direction with `inverseEdge`. An edge written with the inverse name from B to A is the declared edge from A to B, with the same properties. The inverse name is another name for one edge, not a second edge. An `inverseEdge` equal to the declaring edge type's own name makes the edge type **symmetric**: an edge from A to B also holds from B to A.
+
+```yaml
+edgeTypes:
+  worksAt:
+    from: Person
+    to: Company
+    inverseEdge: hasEmployee      # Acme hasEmployee:: [[Ada]] is Ada worksAt Acme
+    properties:
+      since: date
+      role: {values: [engineer, manager]}
+  friendsWith:
+    from: Person
+    to: Person
+    inverseEdge: friendsWith      # symmetric
+```
+
+Only one direction is declared, so `from`, `to` and `properties` exist once. A reader MUST report an inverse name that is also declared as an edge type, or that two edge types share, as `inverse-conflict`, and MUST then read the edge type that names it as having no inverse. The edge type declared first by section 3.1 keeps a shared inverse name. A type's `edges` (section 5.3) MAY list an inverse name, because a type's rule is written from that type's side.
+
+An edge has a name at each of its ends. At its declared source the name is its type. At its declared target the name is its inverse name, or its type when the type is symmetric. An edge whose type has no inverse has a name only at its source.
+
+The **canonical edges** of a vault are its written edges with every edge written under an inverse name replaced by the declared edge type with source and target swapped. Two written edges that are the two ends of one edge are one canonical edge:
+
+- an edge of a declared type and an edge written under its inverse name between the same notes in the opposite direction;
+- the two directions of a symmetric edge type between the same two notes.
+
+Both edges MUST have the same sign, and they pair in the order they are written. The canonical edge has the properties of the declared direction (for a symmetric type, of the edge written from the note that comes first in path order), filled in from the other end. Writing both ends is allowed.
 
 ## 7. Identifiers
 
@@ -447,6 +478,8 @@ A template (section 8) MAY use these tokens, which a reader that supports them r
 
 Validation is advisory. A validator MUST report diagnostics and MUST NOT remove notes or edges from the graph. Stub targets and targets without labels are never reported as having the wrong type.
 
+When edge types declare inverses (section 6.1), a validator MUST check endpoints, edge properties, `missing-edge` and `too-many-edges` on the canonical edges. A node's `required` and `many` rules count the canonical edges by the name they have at that node, so an edge written from the other end satisfies a required edge. A type's rule for an inverse name constrains the declared source, read from the target's type. `edge-not-allowed` MUST be checked on the edges as written, because it governs what a note may write.
+
 For a node with labels L1, L2, …, the **effective schema** merges the schemas of its labels in order: the first declaration of a property wins; `elements` and `sections` are unioned by tag and by heading, and the first label that declares a tag or heading gives its whole declaration; edge rules are unioned per edge type, with targets unioned (any target if one rule allows any), `many` if any rule allows many and `required` if any rule requires it; `edges` is unrestricted only if no label declares it.
 
 | Diagnostic | Reported when |
@@ -467,6 +500,8 @@ For a node with labels L1, L2, …, the **effective schema** merges the schemas 
 | `wrong-source-type` | the source has labels and none is in the edge type's `from` |
 | `missing-edge-property` | a `required` edge property is absent from the edge |
 | `edge-value-not-allowed` | an edge property value is not in its `values` |
+| `inverse-conflict` | an inverse name is declared as an edge type, or two edge types share it (section 6.1; 0.7) |
+| `inverse-mismatch` | the two written ends of one edge differ in a property other than `id`, or one end asserts an edge the other denies (section 6.1; 0.7); reported at the second end |
 
 Readers SHOULD report each diagnostic with the note path and, for edges, the line of the edge. Message text is not specified.
 
@@ -486,7 +521,7 @@ A schema note MAY declare `tgs: "<major>.<minor>"`. A reader implementing versio
 - MUST report a note that declares another major version as `unsupported-version` and MUST NOT use its declarations;
 - MUST read notes without `tgs` as version 0.1.
 
-TGS 0.2 adds the `id` key (section 8.1) and the template tokens. TGS 0.3 adds AsciiDoc notes (section 2.1) and adds no schema key. TGS 0.4 adds `description` (section 4.1), `elements` and `sections` (sections 4.2 to 4.5) and document validation (section 4.8); unknown keys inside an element declaration are reported like those of a type. TGS 0.5 adds no key. It fixes how elements are declared and read: the attribute keys that have a meaning and the reserved `id` (section 4.3), the scope of nested declarations and counting per container (section 4.4), and one normal form for every shorthand (section 4.9). TGS 0.6 adds no key and changes no rule. It moves the identifiers of the specification to `https://typedgraph.org/`: the address of each version, the JSON Schema `$id`, and the `tgs:` namespace, which was `https://volland.github.io/obsigraph/ns/tgs#` in versions 0.1 to 0.5 (section 13.4). Every 0.1 note is a valid 0.2 note, every 0.2 note is a valid 0.3 note, every 0.3 note is a valid 0.4 note, every 0.4 note is a valid 0.5 note, and every 0.5 note is a valid 0.6 note.
+TGS 0.2 adds the `id` key (section 8.1) and the template tokens. TGS 0.3 adds AsciiDoc notes (section 2.1) and adds no schema key. TGS 0.4 adds `description` (section 4.1), `elements` and `sections` (sections 4.2 to 4.5) and document validation (section 4.8); unknown keys inside an element declaration are reported like those of a type. TGS 0.5 adds no key. It fixes how elements are declared and read: the attribute keys that have a meaning and the reserved `id` (section 4.3), the scope of nested declarations and counting per container (section 4.4), and one normal form for every shorthand (section 4.9). TGS 0.6 adds no key and changes no rule. It moves the identifiers of the specification to `https://typedgraph.org/`: the address of each version, the JSON Schema `$id`, and the `tgs:` namespace, which was `https://volland.github.io/obsigraph/ns/tgs#` in versions 0.1 to 0.5 (section 13.4). TGS 0.7 adds `inverseEdge` to edge type declarations: inverse and symmetric edge types, canonical edges, the `inverse-conflict` and `inverse-mismatch` diagnostics (section 6.1) and the `tgs:inverseEdge` annotation (section 13.4). Every 0.1 note is a valid 0.2 note, every 0.2 note is a valid 0.3 note, every 0.3 note is a valid 0.4 note, every 0.4 note is a valid 0.5 note, every 0.5 note is a valid 0.6 note, and every 0.6 note is a valid 0.7 note.
 
 Minor versions only add optional keys. A published version never changes.
 
@@ -562,6 +597,7 @@ What SHACL cannot express is kept as annotations in the namespace `https://typed
 | `tgs:default` | property shape | a non-scalar default as a JSON literal |
 | `tgs:elements` | node shape | the type's `elements` as a JSON literal in the compact form of section 4.9 (0.4) |
 | `tgs:sections` | node shape | the type's `sections` as a JSON literal (0.4) |
+| `tgs:inverseEdge` | edge shape | the edge type's `inverseEdge` name as a string (0.7) |
 
 ### 13.5 Import
 
@@ -580,7 +616,7 @@ An importer that writes notes SHOULD write one note per type by default (or grou
 
 ### 13.6 Round trip
 
-For schemas written in TGS, export followed by import MUST reproduce the same types, edge types, properties, edges, identifiers, templates, visualization, descriptions, elements and sections. Exporting the result again yields the same RDF graph; the reference implementation produces byte-identical Turtle.
+For schemas written in TGS, export followed by import MUST reproduce the same types, edge types, properties, edges, identifiers, templates, visualization, descriptions, elements, sections and inverse names. Exporting the result again yields the same RDF graph; the reference implementation produces byte-identical Turtle.
 
 ## 14. Conformance
 
@@ -601,7 +637,7 @@ SHACL cases also have a `shapes.ttl` that an exporter's output must be isomorphi
 
 ## 15. JSON Schema
 
-`tgs.schema.json` (JSON Schema draft 2020-12) validates the TGS keys of a schema note's frontmatter. It is strict about TGS 0.6 keys and leaves `visualization` and all non-TGS keys open. Notes declaring a newer minor version may not validate against it.
+`tgs.schema.json` (JSON Schema draft 2020-12) validates the TGS keys of a schema note's frontmatter. It is strict about TGS 0.7 keys and leaves `visualization` and all non-TGS keys open. Notes declaring a newer minor version may not validate against it.
 
 ## 16. References
 
