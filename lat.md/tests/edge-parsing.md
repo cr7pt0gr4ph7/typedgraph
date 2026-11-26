@@ -35,6 +35,10 @@ An edge under `## Colleagues` records `Colleagues` as its heading; edges before 
 
 An unclosed `{since: 2020` keeps the edge with no properties and reports a diagnostic with the note path and line.
 
+## Editor underlines edge problems
+
+The plugin's editor ranges for a CRLF note cover one character for a block that stops parsing at the line end and run from the bad token to the line end otherwise; a valid block gives no range.
+
 ## Code fences ignored
 
 Edge syntax inside fenced code blocks, and inside YAML frontmatter, creates no edges.

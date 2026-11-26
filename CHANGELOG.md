@@ -2,6 +2,12 @@
 
 All notable changes to the Typed Graph plugin, the `tg` CLI, the core library and the sidecar. The VS Code extension keeps its own [changelog](packages/vscode/CHANGELOG.md).
 
+## Unreleased
+
+### Added
+
+- **Squiggles for edge syntax in Obsidian.** The editor underlines malformed edge property blocks with a wavy line in source mode and live preview, with the finding as hover text. It does not wait for the vault index.
+
 ## 0.31.0 — 2026-11-24
 
 OpenFlow joins the spec frameworks `tg` traces.
