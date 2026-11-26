@@ -42,3 +42,7 @@ Endpoints, edge properties and counts are checked on the declared direction, and
 ## Queries match either name
 
 With the ontology, a Cypher pattern with the declared name or the inverse name matches the edge whichever end wrote it, and a symmetric edge matches both ways.
+
+## Inverse edges survive SHACL
+
+The SHACL export writes `inverseEdge` as `tgs:inverseEdge` on the edge shape, and import and a second export give it back unchanged.

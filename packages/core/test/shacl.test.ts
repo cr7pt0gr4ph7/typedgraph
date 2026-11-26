@@ -239,3 +239,23 @@ describe('SHACL import', () => {
     expect(again.unchanged.sort()).toEqual(['Types/Doc.md', 'Types/Org.md', 'Types/Team.md']);
   });
 });
+
+describe('SHACL inverse edges', () => {
+  // @tg: verifies:: [[tests/inverse-edges#Inverse edges survive SHACL]] {level: unit}
+  it('exports inverseEdge as tgs:inverseEdge and imports it back', () => {
+    const fm = { tgs: '0.7', edgeTypes: { worksAt: { from: 'Person', to: 'Company', inverseEdge: 'hasEmployee' }, friendsWith: { inverseEdge: 'friendsWith' } } };
+    const texts = new Map([['Types/Edges.md', `---\n${JSON.stringify(fm)}\n---\n`]]);
+    const ttl = exportShacl(setFromTexts(texts));
+    expect(ttl).toContain('tgs:inverseEdge "hasEmployee"');
+    expect(ttl).toContain('tgs:inverseEdge "friendsWith"');
+    const imp = importShacl(ttl);
+    expect(imp.dropped).toEqual([]);
+    expect(imp.edgeTypes.map((e) => [e.type, e.inverseEdge])).toEqual([
+      ['friendsWith', 'friendsWith'],
+      ['worksAt', 'hasEmployee'],
+    ]);
+    const back = setFromTexts(apply(new Map(), planImport(imp, [], {})));
+    expect(back.edgeTypes.get('worksAt')?.inverseEdge).toBe('hasEmployee');
+    expect(exportShacl(back)).toBe(ttl);
+  });
+});
