@@ -1,7 +1,8 @@
-import { buildLatGraph, canonicalType, canonicalView, checkDocuments, edgeSemantics, isPlain, DEFAULT_SCHEMA_FOLDER, ELEMENT_LABEL, normalizeFolder, readSchemaNote, schemaSetFromNotes, type ElementSchema, type Graph, type GraphNode, type PropertySchema, type SchemaSet, type SectionSchema } from '@obsigraph/core';
+import { buildLatGraph, canonicalType, canonicalView, checkDocuments, edgeSemantics, isPlain, ELEMENT_LABEL, readSchemaNote, schemaSetFromNotes, type ElementSchema, type Graph, type GraphNode, type PropertySchema, type SchemaSet, type SectionSchema } from '@obsigraph/core';
 import { EXIT_ERROR, EXIT_FINDINGS, EXIT_OK, register, type Command, type Ctx } from '../cli.mjs';
 import { NoLatDir, Project } from '../project.mjs';
 import { readSchemaNotes } from './schema.mjs';
+import { resolveSchemaFolder } from '../config.mjs';
 
 const USAGE = 'ontology [check] [--schema-folder Types] [--json]';
 // Split so tg check does not read the help text as an annotation.
@@ -14,9 +15,9 @@ const BUILTIN_PROPS = new Set(['id', 'test']);
 /** Labels every node of a kind has; they say nothing about its type in the ontology. */
 const GENERIC_LABELS = new Set(['Section', ELEMENT_LABEL]);
 
-function load(ctx: Ctx, flags: Map<string, string | true>): { set: SchemaSet; folder: string } {
-  const flag = flags.get('schema-folder');
-  const folder = normalizeFolder(typeof flag === 'string' ? flag : DEFAULT_SCHEMA_FOLDER);
+function load(ctx: Ctx, flags: Map<string, string | true>): { set: SchemaSet; folder: string } | { error: string } {
+  const { folder, error } = resolveSchemaFolder(ctx.root, flags.get('schema-folder'));
+  if (error) return { error };
   const notes = readSchemaNotes(ctx.root, folder);
   return { set: schemaSetFromNotes(notes.map((n) => readSchemaNote(n.path, n.frontmatter))), folder };
 }
@@ -240,7 +241,7 @@ export function checkOntology(graph: Graph, set: SchemaSet): OntologyFinding[] {
 function runCheck(ctx: Ctx, set: SchemaSet, folder: string): number {
   let project: Project;
   try {
-    project = new Project(ctx.root);
+    project = new Project(ctx.root, { schemaFolder: folder });
   } catch (e) {
     if (e instanceof NoLatDir) {
       ctx.err(`${e.message}\n`);
@@ -266,7 +267,7 @@ function runCheck(ctx: Ctx, set: SchemaSet, folder: string): number {
 
 export const ontology: Command = {
   name: 'ontology',
-  summary: 'List the types and edge types of the project ontology (Types/), or check written typed edges against it',
+  summary: 'List the types and edge types of the project ontology (Types/ or the configured schema folder), or check written typed edges against it',
   usage: USAGE,
   flags: { 'schema-folder': 'string' },
   noProject: true,
@@ -276,7 +277,12 @@ export const ontology: Command = {
       ctx.err(`usage: tg ${USAGE}\n`);
       return EXIT_ERROR;
     }
-    const { set, folder } = load(ctx, flags);
+    const loaded = load(ctx, flags);
+    if ('error' in loaded) {
+      ctx.err(`${loaded.error}\n`);
+      return EXIT_ERROR;
+    }
+    const { set, folder } = loaded;
     return sub === 'check' ? runCheck(ctx, set, folder) : runList(ctx, set, folder);
   },
 };

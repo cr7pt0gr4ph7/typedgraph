@@ -37,8 +37,8 @@
         },
         "typegraph.schemaFolder": {
           "type": "string",
-          "default": "Types/",
-          "markdownDescription": "Folder, relative to the workspace folder, whose notes declare types (TGS). Used by the **New Typed Note** commands."
+          "default": "",
+          "markdownDescription": "Folder, relative to the workspace folder, whose notes declare types (TGS). Used by the **New Typed Note** commands. Leave empty to follow `schemaFolder` in the workspace's `.tg/config.json` (the `tg` CLI's config), or `Types/` without one; a value here overrides it."
         },
         "typegraph.fullGraphLimit": {
           "type": "number",

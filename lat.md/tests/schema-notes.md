@@ -1,5 +1,6 @@
 ---
 type: Scenario
+openspec: ["schema-notes#Schema folder from the project config"]
 lat:
   require-code-mention: true
 ---
@@ -94,4 +95,28 @@ A `template` link in a wikilink, markdown link or path form picks the template b
 ## Template generated
 
 A type with no template gets a generated one with property placeholders and edge lines that create no edges.
+
+## Schema folder from tg config
+
+The plugin's "Sync .tg/config.json" setting, described in [[graph-model#Schema notes#Schema folder from tg config]].
+
+### Config file values
+
+A usable `schemaFolder` is read with a trailing slash, `..` and non-JSON are ignored, and a new folder is merged into the file keeping its other keys.
+
+### New configuration follows the file
+
+With no saved plugin data, sync turns on and the schema folder becomes the file's when the vault has `.tg/config.json`; without the file, or with saved data, nothing changes.
+
+### Setting change writes the file
+
+A new schema folder is written into the file with its other keys kept, a file that already agrees is not rewritten, a missing file is created, and a non-object file is left alone.
+
+### File change updates the setting
+
+An outside edit of the file is adopted on the next poll, once; the plugin's own write is not taken for an outside edit.
+
+### Sync toggle in the settings
+
+"Sync .tg/config.json" follows "Schema folder" in the settings list, is off by default and goes through the plugin's `setTgConfigSync`.
 

@@ -31,6 +31,8 @@ export {
   mergeSchemas,
   newNoteProperties,
   normalizeFolder,
+  configFolder,
+  schemaFolderProblem,
   PROPERTY_KINDS,
   readElementDeclarations,
   readSchema,

@@ -1,6 +1,6 @@
 ---
 type: Decision
-openspec: [vscode-extension, graph-export]
+openspec: [vscode-extension, graph-export, typed-note-creation]
 ---
 # VS Code Extension
 
@@ -50,7 +50,7 @@ It lists the files the defaults would touch and asks to confirm first; the termi
 
 TypeGraph: New Typed Note creates a note from a declared type, and the child and sibling commands branch from the active note's Luhmann id.
 
-[[packages/vscode/src/new-note.ts#planWorkspaceNote]] is pure over the index: it finds the type in the schema folder (`typegraph.schemaFolder`, default `Types/`), reads the linked template note from disk, and returns a path and content with ids and template tokens filled in by core's planner. The adapter offers a type picker with each type's id kinds and its `description` (its properties when it has none, [[elements#Descriptions]]), asks for a title, never overwrites an existing file, and opens the new note. The command is also in the Explorer folder menu, which picks the folder. Child and sibling commands need the active note to have a value for its type's Luhmann id property; they create a note of the same type next to it with the next free id and a link back through the template's `{{parent-link}}`. When the type's template is an `.adoc` file the planned note is `.adoc` with its leading block and `:tg-*:` entries filled in ([[packages/core/src/schema/adocnote.ts#renderAdocNote]]).
+[[packages/vscode/src/new-note.ts#planWorkspaceNote]] is pure over the index: it finds the type in the schema folder from [[packages/vscode/src/schema-folder.ts#workspaceSchemaFolder]]: `typegraph.schemaFolder` when the user set it (detected with `inspect`, as the setting's default is empty), else `schemaFolder` in `.tg/config.json`, re-read on every use, else `Types/` (see [[cli#Code ontology#Schema folder]]). It reads the linked template note from disk, and returns a path and content with ids and template tokens filled in by core's planner. The adapter offers a type picker with each type's id kinds and its `description` (its properties when it has none, [[elements#Descriptions]]), asks for a title, never overwrites an existing file, and opens the new note. The command is also in the Explorer folder menu, which picks the folder. Child and sibling commands need the active note to have a value for its type's Luhmann id property; they create a note of the same type next to it with the next free id and a link back through the template's `{{parent-link}}`. When the type's template is an `.adoc` file the planned note is `.adoc` with its leading block and `:tg-*:` entries filled in ([[packages/core/src/schema/adocnote.ts#renderAdocNote]]).
 
 ## Privacy
 

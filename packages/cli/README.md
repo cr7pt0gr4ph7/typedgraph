@@ -135,7 +135,7 @@ The relations come from your ontology, the cue words from the sentence (`because
 | `tg cypher <query>` | Read-only openCypher over sections, code files and symbols |
 | `tg edges` | List `@lat:` and `@tg:` annotation edges with type, sign and properties |
 | `tg migrate` | Migrate a lat.md project: setup swap, typed files, typed links with metadata, `@lat:` → `@tg:` |
-| `tg ontology` / `ontology check` | List the project's types and edge types from `Types/`; check written typed edges against them |
+| `tg ontology` / `ontology check` | List the project's types and edge types from the schema folder (`Types/`); check written typed edges against them |
 | `tg trace [capability] --gaps` | Which code implements, which tests verify and which docs explain each OpenSpec requirement |
 | `tg validate` | Check a notes vault against its schema notes, with JSON or SARIF for CI |
 | `tg schema export` / `import` | Exchange schemas with RDF tools as SHACL |
@@ -144,6 +144,8 @@ The relations come from your ontology, the cue words from the sentence (`because
 | `tg hook` | Agent hook handler (installed by `tg init`) |
 
 Every command takes `--json`. Exit code 0 means clean, 1 means findings, 2 means a usage error.
+
+The ontology lives in `Types/` unless you say otherwise: commands that read or write it (`cypher`, `ontology`, `validate`, `schema`, `migrate`, `init`, `upgrade`) take `--schema-folder dir`, and without the flag read `schemaFolder` from `.tg/config.json`. `tg init --schema-folder Ontology` records it there for you.
 
 ## The rest of Typed Graph
 

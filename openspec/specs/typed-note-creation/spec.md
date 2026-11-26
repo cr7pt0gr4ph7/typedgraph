@@ -73,7 +73,7 @@ The system SHALL create a child or sibling of the active note by reading the act
 - **THEN** the new note gets `folgezettel: 1a2` and its template's parent link points to the active note
 
 ### Requirement: Note creation commands
-The Obsidian plugin SHALL offer "New typed note", a ribbon menu with one entry per type, "New typed note here" on a folder's context menu, and "New child note", "New sibling note" and "New top-level note" for Luhmann types; the VS Code extension SHALL offer "New Typed Note" (also on Explorer folders), "New Child Note" and "New Sibling Note" reading types from `typegraph.schemaFolder`. Both hosts SHALL plan the note with the same core planner, SHALL refuse an unknown type or an invalid title, and SHALL never overwrite an existing file.
+The Obsidian plugin SHALL offer "New typed note", a ribbon menu with one entry per type, "New typed note here" on a folder's context menu, and "New child note", "New sibling note" and "New top-level note" for Luhmann types; the VS Code extension SHALL offer "New Typed Note" (also on Explorer folders), "New Child Note" and "New Sibling Note" reading types from the schema folder of the Schema folder in VS Code requirement. Both hosts SHALL plan the note with the same core planner, SHALL refuse an unknown type or an invalid title, and SHALL never overwrite an existing file.
 
 #### Scenario: New note in a folder
 - **WHEN** the user picks "New typed note here" on folder `Notes/` and type `Permanent` with title `Idea`
@@ -86,3 +86,14 @@ The Obsidian plugin SHALL offer "New typed note", a ribbon menu with one entry p
 #### Scenario: Unknown type refused
 - **WHEN** VS Code is asked to plan a note of a type no schema note declares
 - **THEN** nothing is written and the user is told the type is unknown
+
+### Requirement: Schema folder in VS Code
+The VS Code extension SHALL read types from `typegraph.schemaFolder` when the user set it to a non-blank value at any scope, and otherwise from `schemaFolder` in the workspace folder's `.tg/config.json`, read again on every use so an edit applies without a reload, and otherwise from `Types/`. The setting's own default SHALL be empty, so it never hides the config. A value outside the workspace SHALL be refused with a warning and the next source used.
+
+#### Scenario: Config by default
+- **WHEN** `typegraph.schemaFolder` is not set and `.tg/config.json` names `Ontology`, then is edited to name `./Schemas/`
+- **THEN** New Typed Note offers the types in `Ontology/`, then reads `Schemas/`; a workspace without the file reads `Types/`
+
+#### Scenario: Setting overrides
+- **WHEN** the user sets `typegraph.schemaFolder` to `Types` while the config names `Ontology`, or to `../shared`
+- **THEN** `Types/` is read; for `../shared` a warning says it must stay inside the project and `Ontology/` is read

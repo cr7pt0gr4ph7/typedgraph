@@ -1,10 +1,11 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
-import { DEFAULT_SCHEMA_FOLDER, normalizeFolder, readSchemaNote, schemaSetFromNotes, splitFrontmatter } from '@obsigraph/core';
+import { readSchemaNote, schemaSetFromNotes, splitFrontmatter } from '@obsigraph/core';
 import { exportShacl, importShacl, planImport, type ExistingNote } from '@obsigraph/core/src/shacl.js';
 import { parse as parseYaml } from 'yaml';
 import { EXIT_ERROR, EXIT_FINDINGS, EXIT_OK, register, type Command, type Ctx } from '../cli.mjs';
 import { ignoredCodes, MISSING_ONTOLOGY, missingOntology } from '../schema-folder.mjs';
+import { resolveSchemaFolder } from '../config.mjs';
 
 const USAGE = [
   'schema export <out.ttl> [--format shacl] [--vault dir] [--schema-folder Types] [--ignore missing-ontology] [--base iri]',
@@ -139,7 +140,12 @@ export const schema: Command = {
       ctx.err(`${vault} is not a directory\n`);
       return EXIT_ERROR;
     }
-    const folder = normalizeFolder(str(flags, 'schema-folder') ?? DEFAULT_SCHEMA_FOLDER);
+    const schema = resolveSchemaFolder(vault, flags.get('schema-folder'));
+    if (schema.error) {
+      ctx.err(`${schema.error}\n`);
+      return EXIT_ERROR;
+    }
+    const folder = schema.folder;
     return sub === 'export' ? runExport(ctx, target, vault, folder, flags) : runImport(ctx, target, vault, folder, flags);
   },
 };
