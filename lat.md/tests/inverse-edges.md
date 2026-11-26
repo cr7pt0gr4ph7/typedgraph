@@ -63,6 +63,10 @@ With `deletions: mirror` a lone end found left over (written with the inverse na
 
 `tg inverses` lists missing and differing ends as a dry run (exit 1), writes them with `--write`, and takes placement, heading, winner and deletions as flags.
 
+## Plugin writes inverse edges on command and on save
+
+The Obsidian plugin syncs with its settings (placement, heading, source of truth, deletions; all off or declared by default), limited to saved notes, once saves pause and never for its own writes.
+
 ## Inverse edges survive SHACL
 
 The SHACL export writes `inverseEdge` as `tgs:inverseEdge` on the edge shape, and import and a second export give it back unchanged.

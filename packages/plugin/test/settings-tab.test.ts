@@ -62,6 +62,17 @@ describe('settings tab', () => {
     );
   });
 
+  // @tg: verifies:: [[tests/inverse-edges#Plugin writes inverse edges on command and on save]] {level: unit}
+  it('offers the inverse edge options, off and declared by default', async () => {
+    const { t, plugin } = tab();
+    const items = t.getSettingDefinitions().flatMap((g) => ('items' in g ? (g.items ?? []) : [g]));
+    const keys = items.flatMap((i) => (i && 'control' in i && i.control ? [i.control.key] : []));
+    expect(keys).toEqual(expect.arrayContaining(['inverseOnSave', 'inversePlacement', 'inverseHeading', 'inverseWinner', 'inverseDeletions']));
+    expect([plugin.settings.inverseOnSave, plugin.settings.inversePlacement, plugin.settings.inverseWinner, plugin.settings.inverseDeletions]).toEqual([false, 'heading', 'declared', 'keep']);
+    await t.setControlValue('inverseHeading', '  ');
+    expect(plugin.settings.inverseHeading).toBe('Relations');
+  });
+
   it('applies the legacy side effects: code mode, code folder and base IRI', async () => {
     const { t, plugin, refresh } = tab();
     await t.setControlValue('codeMode', 'all');
