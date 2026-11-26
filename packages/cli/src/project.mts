@@ -1,9 +1,9 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { compileIgnore, DEFAULT_SCHEMA_FOLDER, LatIndex, lookupSymbol, readSchemaNote, scanAnnotations, schemaSetFromNotes, SpecIndex, splitFrontmatter, type Annotation, type Diagnostic, type SchemaSet, type SpecFrameworkId } from '@obsigraph/core';
+import { compileIgnore, LatIndex, lookupSymbol, readSchemaNote, scanAnnotations, schemaSetFromNotes, SpecIndex, splitFrontmatter, type Annotation, type Diagnostic, type SchemaSet, type SpecFrameworkId } from '@obsigraph/core';
 import { parse as parseYaml } from 'yaml';
 import { detectSpecs, specFiles } from './specs.mjs';
-import { readConfig, type TgConfig } from './config.mjs';
+import { readConfig, resolveSchemaFolder, type TgConfig } from './config.mjs';
 import { DOCS_DIRS, existingDocsDir, type DocsDir } from './root.mjs';
 import { walkProject } from './walk.mjs';
 
@@ -31,7 +31,11 @@ export class Project {
   private noteCache: string[] | null = null;
   private schemaCache: SchemaSet | null = null;
 
-  constructor(readonly root: string) {
+  private schemaFolderValue: string | undefined;
+
+  /** `schemaFolder` overrides the config's `schemaFolder` (a `--schema-folder` value, already checked). */
+  constructor(readonly root: string, options: { schemaFolder?: string } = {}) {
+    this.schemaFolderValue = options.schemaFolder;
     const dir = existingDocsDir(root);
     if (!dir) throw new NoLatDir(root);
     this.latDirName = dir;
@@ -110,14 +114,20 @@ export class Project {
     return this.specCache;
   }
 
-  /** The ontology declared by the schema notes directly in `Types/` (empty when there are none). */
+  /** The schema folder, with a trailing slash: the constructor's, else `schemaFolder` in `.tg/config.json`, else `Types/`. */
+  schemaFolder(): string {
+    return (this.schemaFolderValue ??= resolveSchemaFolder(this.root, undefined).folder);
+  }
+
+  /** The ontology declared by the schema notes directly in the schema folder (empty when there are none). */
   schemas(): SchemaSet {
     if (!this.schemaCache) {
-      const dir = join(this.root, DEFAULT_SCHEMA_FOLDER);
+      const folder = this.schemaFolder();
+      const dir = join(this.root, folder);
       const names = existsSync(dir) && statSync(dir).isDirectory() ? readdirSync(dir).filter((f) => f.endsWith('.md') && statSync(join(dir, f)).isFile()).sort() : [];
       this.schemaCache = schemaSetFromNotes(
         names.map((f) => {
-          const path = `${DEFAULT_SCHEMA_FOLDER}${f}`;
+          const path = `${folder}${f}`;
           const { yaml } = splitFrontmatter(this.text(path) ?? '');
           let fm: Record<string, unknown> | null = null;
           try {

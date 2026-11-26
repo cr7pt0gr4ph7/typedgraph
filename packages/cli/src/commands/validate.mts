@@ -1,8 +1,9 @@
 import { existsSync, statSync } from 'node:fs';
 import { join, relative, resolve, sep } from 'node:path';
-import { DEFAULT_SCHEMA_FOLDER, normalizeFolder, validateVault, type VaultFinding, type NoteInput } from '@obsigraph/core';
+import { validateVault, type VaultFinding, type NoteInput } from '@obsigraph/core';
 import { listNotes, parseYaml, readNote } from '@obsigraph/node-vault';
 import { EXIT_ERROR, EXIT_FINDINGS, EXIT_OK, register, VERSION, type Command, type Ctx } from '../cli.mjs';
+import { resolveSchemaFolder } from '../config.mjs';
 
 const USAGE = 'validate [--vault dir] [--schema-folder Types] [--only codes] [--ignore codes] [--schema-only] [--frontmatter-edges] [--strict] [--format text|json|sarif]';
 
@@ -99,11 +100,16 @@ async function runValidate(ctx: Ctx, flags: Map<string, string | true>): Promise
     ctx.err(`${vault} is not a directory\n`);
     return EXIT_ERROR;
   }
+  const schema = resolveSchemaFolder(vault, flags.get('schema-folder'));
+  if (schema.error) {
+    ctx.err(`${schema.error}\n`);
+    return EXIT_ERROR;
+  }
   const notes = await readVault(vault);
   const only = codes(str(flags, 'only'));
   const ignore = codes(str(flags, 'ignore')) ?? new Set<string>();
   const findings = validateVault(notes, {
-    schemaFolder: normalizeFolder(str(flags, 'schema-folder') ?? DEFAULT_SCHEMA_FOLDER),
+    schemaFolder: schema.folder,
     schemaOnly: flags.has('schema-only'),
     frontmatterEdges: flags.has('frontmatter-edges'),
     parseYaml,

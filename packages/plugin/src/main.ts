@@ -12,6 +12,7 @@ import { DiagnosticsModal, registerSchemaCommands } from './schema-commands';
 import { registerTgIcon, TG_ICON } from './icon';
 import { noteScope, obsidianIgnored } from './note-scope';
 import { statusCount, type StatusCount } from './status-count';
+import { syncOnLoad, TG_CONFIG_POLL_MS, TgConfigSync, type ConfigAdapter } from './tg-config';
 
 /** Pause after the last folder-setting edit before the vault is re-indexed. */
 const REINDEX_DELAY_MS = 800;
@@ -27,10 +28,18 @@ export default class ObsigraphPlugin extends Plugin {
   private status: HTMLElement | null = null;
   private counts: StatusCount | null = null;
   private reindexTimer: number | null = null;
+  private pushTimer: number | null = null;
   private reindexing: Promise<void> = Promise.resolve();
+  /** Keeps the schema folder in step with `.tg/config.json` while "Sync .tg/config.json" is on. */
+  tgConfig!: TgConfigSync;
 
   // @tg: implements:: [[openspec:graph-query-block#Block structure]]
   async onload(): Promise<void> {
+    this.tgConfig = new TgConfigSync(
+      this.app.vault.adapter as unknown as ConfigAdapter,
+      () => this.settings.schemaFolder,
+      (folder) => this.applySchemaFolder(folder),
+    );
     await this.loadSettings();
     this.index = new VaultIndex(
       this.app,
@@ -52,6 +61,8 @@ export default class ObsigraphPlugin extends Plugin {
         ),
     );
     this.addSettingTab(new ObsigraphSettingTab(this.app, this));
+    // Obsidian reports no changes inside dot folders, so the config is checked on a timer while sync is on.
+    this.registerInterval(window.setInterval(() => void (this.settings.syncTgConfig ? this.tgConfig.poll() : null), TG_CONFIG_POLL_MS));
 
     this.registerMarkdownCodeBlockProcessor('graph-query', (source, el, ctx) => {
       ctx.addChild(new QueryBlock(el, source, ctx.sourcePath, this));
@@ -116,6 +127,11 @@ export default class ObsigraphPlugin extends Plugin {
 
   onunload(): void {
     if (this.reindexTimer !== null) window.clearTimeout(this.reindexTimer);
+    // A pending write of `.tg/config.json` still happens, so the last schema folder edit is not lost.
+    if (this.pushTimer !== null) {
+      window.clearTimeout(this.pushTimer);
+      if (this.settings.syncTgConfig) void this.tgConfig.push();
+    }
     this.index?.destroy();
   }
 
@@ -149,8 +165,14 @@ export default class ObsigraphPlugin extends Plugin {
     return s.indexFolders.trim() !== '' || s.excludeFolders.trim() !== '' || s.obsidianExcluded;
   }
 
+  /**
+   * Saved settings over the defaults. A new configuration (no saved data yet) syncs with `.tg/config.json` when the
+   * vault has one, and so starts from its schema folder; with sync on, the file's folder wins over the saved one.
+   */
   async loadSettings(): Promise<void> {
-    this.settings = { ...DEFAULT_SETTINGS, ...((await this.loadData()) as Partial<ObsigraphSettings> | null) };
+    const saved = (await this.loadData()) as Partial<ObsigraphSettings> | null;
+    this.settings = { ...DEFAULT_SETTINGS, ...saved };
+    await syncOnLoad(this.settings, saved === null, this.tgConfig);
   }
 
   // @tg: implements:: [[openspec:visualization-config#Live style updates]]
@@ -158,6 +180,30 @@ export default class ObsigraphPlugin extends Plugin {
     await this.saveData(this.settings);
     this.index.invalidate();
     for (const fn of this.styleListeners) fn();
+    // The schema folder is typed a key at a time, so the file is written once typing pauses.
+    if (this.settings.syncTgConfig) {
+      if (this.pushTimer !== null) window.clearTimeout(this.pushTimer);
+      this.pushTimer = window.setTimeout(() => {
+        this.pushTimer = null;
+        void this.tgConfig.push();
+      }, REINDEX_DELAY_MS);
+    }
+  }
+
+  /** Use a schema folder read from `.tg/config.json`: before the index exists only the setting changes. */
+  private async applySchemaFolder(folder: string): Promise<void> {
+    this.settings.schemaFolder = folder;
+    if (!this.index) return;
+    this.index.invalidate();
+    await this.saveSettings();
+    if (this.hasScope()) this.requestReindex();
+  }
+
+  /** Turn "Sync .tg/config.json" on or off. Turning it on adopts the file's folder, or writes the setting's when the file names none. */
+  async setTgConfigSync(on: boolean): Promise<void> {
+    this.settings.syncTgConfig = on;
+    if (on && (await this.tgConfig.pull())) return;
+    await this.saveSettings();
   }
 
   /** Switch the code layer between off, annotated and all; saves the setting and rebuilds the layer. */

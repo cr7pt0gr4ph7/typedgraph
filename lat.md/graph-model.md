@@ -38,6 +38,12 @@ A type's `id` key (TGS 0.2) lists the identifiers a new note gets: `uuid`, a tim
 
 Templates come from the note a type's `template` links to, else the body of a `schema:` note, else one generated from the schema ([[packages/core/src/schema/schema.ts#chooseTemplate]], [[packages/core/src/schema/schema.ts#renderNoteFromType]]); generated edge lines are empty `- type::` placeholders that create no edges. Template text may use `{{title}}`, `{{date}}`, `{{time}}`, `{{id}}`, `{{<id property>}}` and, under a parent, `{{parent}}`, `{{parent-id}}` and `{{parent-link}}`; a line that names the parent disappears when there is none, and other braces such as edge embeds are untouched. The Obsidian plugin offers all of this through a type menu (ribbon, folder context menu and command), and Luhmann child, sibling and top-level commands; VS Code has the same creation commands ([[vscode#Creating notes]]). Schemas are exchanged with RDF tools through [[shacl]].
 
+### Schema folder from tg config
+
+With "Sync .tg/config.json" on, the plugin's schema folder and `schemaFolder` in the vault's `.tg/config.json` stay the same, so the plugin and the `tg` CLI read one folder.
+
+[[packages/plugin/src/tg-config.ts#TgConfigSync]] pulls the file's folder when settings load and when the file changes, and pushes the setting into the file once saving pauses, keeping its other keys and leaving a file that is not a JSON object alone. Obsidian sends no vault events for dot folders, so the file's modification time is polled every three seconds while sync is on; the plugin's own write records the new time and is not pulled back. [[packages/plugin/src/tg-config.ts#syncOnLoad]] turns sync on for a new configuration (no saved plugin data) when the vault has the file; a saved configuration without the setting keeps it off. Turning it on adopts the file's folder, or writes the setting's when the file names none. The toggle sits after "Schema folder" in both settings UIs. Values are checked like the CLI's ([[cli#Code ontology#Schema folder]]). See [[tests/schema-notes#Schema folder from tg config]].
+
 ## Edges
 
 Edges carry a type, optional label, sign, properties, a derived or pinned ID and the heading they were written under.

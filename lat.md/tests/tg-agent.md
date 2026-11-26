@@ -1,5 +1,6 @@
 ---
 type: Scenario
+openspec: ["tg-agent-integration#Schema folder choice"]
 lat:
   require-code-mention: true
 ---
@@ -260,3 +261,18 @@ With `lat.md/` present, `--docs tg.md` creates no `tg.md/` and notes that `lat.m
 ### Default without a terminal
 
 Outside a terminal init asks nothing and plans `lat.md/lat.md`.
+
+## Schema folder choice
+
+How `tg init` and `tg upgrade` use a schema folder other than `Types/`, described in [[cli#Code ontology#Schema folder]].
+
+### Init into another folder
+
+`--schema-folder Ontology` writes the three ontology notes to `Ontology/`, names it in `CLAUDE.md`, the guide and the spec ontology, and records it in `.tg/config.json`.
+
+Both checks pass, no `Types/` exists, and a second init or an upgrade without the flag changes nothing.
+
+### Default folder writes no config
+
+Without the flag, or with `--schema-folder Types`, no `.tg/` is created; a new folder replaces only `schemaFolder` in an existing config.
+
