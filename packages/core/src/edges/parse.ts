@@ -23,6 +23,8 @@ export interface Diagnostic {
   line: number;
   column: number;
   message: string;
+  /** Zero-based column just past the flagged text, when the finding covers a known range. */
+  endColumn?: number;
   /** Stable finding code such as `edge-syntax` or a TGS diagnostic name; see `severityOf`. */
   code?: string;
 }
@@ -64,6 +66,7 @@ const HEADING = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
  */
 // @lat: [[edge-syntax#Inline edge form]]
 // @tg: implements:: [[openspec:edge-parsing#Inline edge form]]
+// @tg: implements:: [[openspec:edge-parsing#Links in property values]]
 // @tg: implements:: [[openspec:edge-parsing#Malformed property blocks]]
 // @tg: implements:: [[openspec:edge-parsing#Markdown link targets]]
 // @tg: implements:: [[openspec:edge-parsing#Non-edge text is ignored]]
@@ -115,7 +118,18 @@ export function parseEdges(text: string, path: string | null = null, options: Pa
     if (rest.startsWith('{')) {
       const restOffset = value.length - rest.length;
       try {
-        props = parseProps(rest).props;
+        const parsed = parseProps(rest);
+        props = parsed.props;
+        for (const w of parsed.warnings) {
+          diagnostics.push({
+            path,
+            line: n,
+            column: valueStart + restOffset + w.offset,
+            endColumn: valueStart + restOffset + w.end,
+            message: `Ambiguous link in edge property: ${w.message}`,
+            code: 'edge-property-link',
+          });
+        }
       } catch (err) {
         if (!(err instanceof PropsSyntaxError)) throw err;
         diagnostics.push({

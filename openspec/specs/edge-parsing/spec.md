@@ -77,6 +77,17 @@ The system SHALL read edge property values as JSON5-like literals: bare numbers 
 - **WHEN** an edge line ends with `{since: 2020, active: true, tags: [a, "b c"], note: null,}`
 - **THEN** the edge has `since` 2020 as a number, `active` true as a boolean, `tags` as the list `a`, `b c`, and `note` null
 
+### Requirement: Links in property values
+The system SHALL warn with an `edge-property-link` finding about an unquoted property value that Obsidian highlights as a wikilink (`[[`, then no bracket or line break, then `]]`), because it reads as a nested list, and SHALL report the value's range so editors can underline it.
+
+#### Scenario: Unquoted link in a property
+- **WHEN** an edge line ends with `{location: [[Location B]]}`
+- **THEN** `location` is the nested list `[["Location B"]]` and an `edge-property-link` warning covers `[[Location B]]`
+
+#### Scenario: Nested lists and quoted links
+- **WHEN** an edge line ends with `{a: "[[X]]", b: [[X],], c: [ [X] ], d: [[1, 2], [3]]}`
+- **THEN** no warning is reported
+
 ### Requirement: Edge lines in lists and quotes
 The system SHALL recognize an edge line whose type is preceded by a list-item marker or a blockquote prefix, and SHALL produce no edge and no diagnostic for a `type::` line that contains no link.
 
