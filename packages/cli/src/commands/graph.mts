@@ -2,7 +2,7 @@ import { BuiltinEngine, buildLatGraph, CypherError, DEFAULT_SCHEMA_FOLDER, isSpe
 import { parseYaml } from '@obsigraph/node-vault';
 import { EXIT_ERROR, EXIT_FINDINGS, EXIT_OK, register, type Command } from '../cli.mjs';
 import { NoLatDir, Project } from '../project.mjs';
-import { missingSchema } from '../schema-folder.mjs';
+import { missingOntology } from '../schema-folder.mjs';
 
 // @tg: implements:: [[openspec:code-layer#Code mode setting]]
 function codeMode(flag: string | true | undefined, env: string | undefined): CodeMode {
@@ -43,9 +43,9 @@ export const cypher: Command = {
       }
       throw e;
     }
-    const noSchema = missingSchema(project.root, DEFAULT_SCHEMA_FOLDER, 'run tg init to install the code ontology');
-    if (noSchema) {
-      ctx.err(`${noSchema}\n`);
+    const noOntology = missingOntology(project.root, DEFAULT_SCHEMA_FOLDER);
+    if (noOntology) {
+      ctx.err(`${noOntology}\n`);
       return EXIT_ERROR;
     }
     let result: QueryResult;

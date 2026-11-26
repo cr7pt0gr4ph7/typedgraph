@@ -2,7 +2,6 @@ import { buildLatGraph, checkDocuments, DEFAULT_SCHEMA_FOLDER, ELEMENT_LABEL, no
 import { EXIT_ERROR, EXIT_FINDINGS, EXIT_OK, register, type Command, type Ctx } from '../cli.mjs';
 import { NoLatDir, Project } from '../project.mjs';
 import { readSchemaNotes } from './schema.mjs';
-import { missingSchema } from '../schema-folder.mjs';
 
 const USAGE = 'ontology [check] [--schema-folder Types] [--json]';
 // Split so tg check does not read the help text as an annotation.
@@ -120,7 +119,7 @@ function runList(ctx: Ctx, set: SchemaSet, folder: string): number {
     return EXIT_OK;
   }
   if (set.schemas.size + set.edgeTypes.size === 0) {
-    ctx.out(`No ontology declared: the schema notes in ${folder} declare no types or edge types. Run tg init to install the code ontology, or add declarations to ${folder}.\n`);
+    ctx.out(`No ontology declared: ${folder} has no schema notes. Run tg init to install the code ontology, or add schema notes to ${folder}.\n`);
     return EXIT_OK;
   }
   const out: string[] = [`Ontology from ${folder}: ${set.schemas.size} type${set.schemas.size === 1 ? '' : 's'}, ${set.edgeTypes.size} edge type${set.edgeTypes.size === 1 ? '' : 's'}`, '', 'Types'];
@@ -256,7 +255,6 @@ function runCheck(ctx: Ctx, set: SchemaSet, folder: string): number {
   return findings.length ? EXIT_FINDINGS : EXIT_OK;
 }
 
-// @tg: implements:: [[openspec:tg-cli#Schema folder required]]
 export const ontology: Command = {
   name: 'ontology',
   summary: 'List the types and edge types of the project ontology (Types/), or check written typed edges against it',
@@ -270,11 +268,6 @@ export const ontology: Command = {
       return EXIT_ERROR;
     }
     const { set, folder } = load(ctx, flags);
-    const noSchema = missingSchema(ctx.root, folder);
-    if (noSchema) {
-      ctx.err(`${noSchema}\n`);
-      return EXIT_ERROR;
-    }
     return sub === 'check' ? runCheck(ctx, set, folder) : runList(ctx, set, folder);
   },
 };

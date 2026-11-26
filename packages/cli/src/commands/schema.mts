@@ -4,10 +4,10 @@ import { DEFAULT_SCHEMA_FOLDER, normalizeFolder, readSchemaNote, schemaSetFromNo
 import { exportShacl, importShacl, planImport, type ExistingNote } from '@obsigraph/core/src/shacl.js';
 import { parse as parseYaml } from 'yaml';
 import { EXIT_ERROR, EXIT_FINDINGS, EXIT_OK, register, type Command, type Ctx } from '../cli.mjs';
-import { missingSchema } from '../schema-folder.mjs';
+import { ignoredCodes, MISSING_ONTOLOGY, missingOntology } from '../schema-folder.mjs';
 
 const USAGE = [
-  'schema export <out.ttl> [--format shacl] [--vault dir] [--schema-folder Types] [--base iri]',
+  'schema export <out.ttl> [--format shacl] [--vault dir] [--schema-folder Types] [--ignore missing-ontology] [--base iri]',
   'schema import <file.ttl> [--vault dir] [--schema-folder Types] [--layout auto|per-type|single] [--into name] [--force] [--base iri]',
 ].join('\n       tg ');
 
@@ -44,9 +44,9 @@ function runExport(ctx: Ctx, outArg: string, vault: string, folder: string, flag
     ctx.err(`unknown format "${format}"; expected shacl\n`);
     return EXIT_ERROR;
   }
-  const noSchema = missingSchema(vault, folder, 'pass --schema-folder or --vault');
-  if (noSchema) {
-    ctx.err(`${noSchema}\n`);
+  const noOntology = ignoredCodes(flags.get('ignore')).has(MISSING_ONTOLOGY) ? null : missingOntology(vault, folder);
+  if (noOntology) {
+    ctx.err(`${noOntology}\n`);
     return EXIT_ERROR;
   }
   const notes = readSchemaNotes(vault, folder);
@@ -126,7 +126,7 @@ export const schema: Command = {
   name: 'schema',
   summary: 'Export schema notes as SHACL or import SHACL shapes into schema notes',
   usage: USAGE,
-  flags: { vault: 'string', 'schema-folder': 'string', format: 'string', base: 'string', layout: 'string', into: 'string', force: 'bool' },
+  flags: { vault: 'string', 'schema-folder': 'string', ignore: 'string', format: 'string', base: 'string', layout: 'string', into: 'string', force: 'bool' },
   noProject: true,
   run(ctx, args, flags) {
     const [sub, target] = args;

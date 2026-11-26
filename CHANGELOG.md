@@ -4,14 +4,14 @@ All notable changes to the Typed Graph plugin, the `tg` CLI, the core library an
 
 ## Unreleased
 
-Commands that read the ontology no longer pass silently when there is none.
+Commands that need the ontology no longer pass silently when there is none.
 
 ### Changed
 
-- **A missing schema folder is an error.** When the schema folder (`Types/`, or `--schema-folder`) is missing, is not a directory or holds no `*.md` schema note, the commands that read it now fail instead of carrying on with an empty ontology. Before, a typo in `--schema-folder`, the wrong working directory or a project without `tg init` looked like a clean result, in CI too.
-  - `tg validate` reports a `missing-schema` finding with severity error on the folder, so it exits 1 even without `--strict`; `--ignore missing-schema` validates a vault that has no schemas on purpose. The finding is in text, JSON and SARIF output, and `--schema-only` reports it too.
-  - `tg ontology`, `tg ontology check`, `tg schema export` and `tg cypher` (and the MCP tools `tg_ontology` and `tg_cypher`) print `schema folder Types/ not found` (or `is not a directory`, or `has no schema notes (*.md)`) with what to do on stderr, write nothing to stdout even with `--json`, and exit 2. `tg schema export` writes no file then.
-  - `tg schema import` is unchanged, since it creates the folder, and so are `tg check` and the other commands that do not read `Types/`.
+- **No schema notes is an error.** When the schema folder (`Types/`, or `--schema-folder`) is missing, is not a directory or holds no `*.md` schema note, the commands that need the ontology now fail instead of carrying on with an empty one. They use the message `tg ontology` already prints: `No ontology declared: Types/ has no schema notes. Run tg init to install the code ontology, or add schema notes to Types/.` Before, a typo in `--schema-folder`, the wrong working directory or a project without `tg init` looked like a clean result, in CI too.
+  - `tg validate` reports a `missing-ontology` finding with severity error on the folder, so it exits 1 even without `--strict`; `--ignore missing-ontology` validates a vault that has no schemas on purpose. The finding is in text, JSON and SARIF output, and `--schema-only` reports it too.
+  - `tg schema export` and `tg cypher` (and the MCP tool `tg_cypher`) print the message to stderr, write nothing to stdout even with `--json`, and exit 2. `tg schema export` then writes no file; `--ignore missing-ontology` exports prefixes only, as before.
+  - `tg ontology` and `tg ontology check` are unchanged and still say no ontology is declared. `tg schema import` is unchanged, since it creates the folder, and so are `tg check` and the other commands that do not read `Types/`.
 
 ## 0.31.0 — 2026-11-24
 

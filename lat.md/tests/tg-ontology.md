@@ -31,9 +31,9 @@ A typed edge line inside a fenced code block adds no edge.
 
 After `tg init`, the JSON listing has six types with `Decision` declaring `status`, and eleven edge types with `motivated_by` from `Decision` to `Constraint`, `Concept` and `Decision`; the text listing shows the same arrow.
 
-### Missing schema folder
+### No ontology
 
-Without `Types/`, `tg ontology`, its check and `tg cypher` print the missing folder and `tg init` to stderr and exit 2; a `Types/` without `*.md` notes and a `--schema-folder` that does not exist fail the same way.
+Without schema notes the listing says no ontology is declared, points at `tg init` and exits 0.
 
 ## Ontology check
 
@@ -49,7 +49,15 @@ A `supersedes::` edge from a `Concept` section is reported as a wrong source, a 
 
 ### Clean ontology use
 
-Declared edges with allowed endpoints and properties pass with exit 0, plain wiki links and `@lat:` comments are ignored, and the same docs without a schema folder exit 2.
+Declared edges with allowed endpoints and properties pass with exit 0, plain wiki links and `@lat:` comments are ignored, and a project with no ontology has nothing to check.
+
+## Missing ontology
+
+Commands that need the ontology to build the graph refuse to run without one.
+
+### Cypher without an ontology
+
+With no schema notes, because `Types/` is missing or holds no `*.md` note, `tg cypher` prints the "No ontology declared" message of `tg ontology` to stderr, prints nothing to stdout and exits 2.
 
 ## Ontology-aware guidance
 

@@ -17,11 +17,11 @@ A vault without findings prints one summary line and exits 0.
 
 ## Vault without schemas
 
-Without `Types/` the first finding is a `missing-schema` error on `Types` and exit 1, then only `edge-syntax` and `embed` findings with their lines; `--ignore missing-schema` exits 0.
+With no schema notes the first finding is a `missing-ontology` error on `Types` and exit 1, then only `edge-syntax` and `embed` findings appear, with their lines; `--ignore missing-ontology` exits 0.
 
 ## Empty schema folder
 
-A `Types/` without `*.md` notes directly inside it gives `missing-schema` in text output with one error counted, `--schema-only` exits 1 too, and a `--schema-folder` that does not exist is named in the finding.
+With no schema notes directly in `Types/` the text output shows the `missing-ontology` error with one error counted, `--schema-only` exits 1 too, and a `--schema-folder` that does not exist is named in the finding.
 
 ## Finding codes
 
