@@ -63,6 +63,7 @@ describe('settings tab', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Plugin writes inverse edges on command and on save]] {level: unit}
+  // @lat: [[tests/inverse-edges#Plugin writes inverse edges on command and on save]]
   it('offers the inverse edge options, off and declared by default', async () => {
     const { t, plugin } = tab();
     const items = t.getSettingDefinitions().flatMap((g) => ('items' in g ? (g.items ?? []) : [g]));

@@ -192,6 +192,7 @@ const PARTS = {
 const parts = (body: string) => ({ ...PARTS, 'lat.md/parts.md': `---\ntype: Concept\n---\n# Parts\n\nThings and their parts.\n\n## Car\n\nA car.\n\n- has_part:: [[parts#Wheel]] {count: 4}\n\n## Wheel\n\nA wheel.\n\n${body}` });
 
 // @tg: verifies:: [[tests/inverse-edges#Ontology check knows inverse names]] {level: unit}
+// @lat: [[tests/inverse-edges#Ontology check knows inverse names]]
 it('accepts an inverse name in tg ontology check and reports ends that disagree', async () => {
   const ok = await tg(project(parts('- part_of:: [[parts#Car]] {count: 4}\n')), ['ontology', 'check']);
   expect(ok.out).toContain('All typed edges agree with the ontology');
@@ -204,6 +205,7 @@ it('accepts an inverse name in tg ontology check and reports ends that disagree'
 });
 
 // @tg: verifies:: [[tests/inverse-edges#Queries match either name]] {level: integration}
+// @lat: [[tests/inverse-edges#Queries match either name]]
 it('matches an inverse name in tg cypher', async () => {
   const dir = project(parts(''));
   const r = await tg(dir, ['cypher', '--json', 'MATCH (w)-[:part_of]->(c) RETURN w.title, c.title']);

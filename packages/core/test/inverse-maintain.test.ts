@@ -24,6 +24,7 @@ function vault(files: Record<string, string>, frontmatterEdges = false) {
 
 describe('maintaining inverse edges', () => {
   // @tg: verifies:: [[tests/inverse-edges#Missing ends are written]] {level: unit}
+  // @lat: [[tests/inverse-edges#Missing ends are written]]
   // @tg: verifies:: [[openspec:schema-notes#Maintain inverse edges#Missing end written under a heading]]
   it('writes the missing end under a heading, and is idempotent', () => {
     const v = vault({ 'Ada.md': '# Ada\n\n- worksAt:: [[Acme]] {role: engineer}\n- friendsWith:: [[Bob]]\n', 'Acme.md': '# Acme\n\nA company.\n', 'Bob.md': '# Bob\n\n## Relations\n\n- knows:: [[Ada]]\n\n## Notes\n\nText.\n' });
@@ -38,6 +39,7 @@ describe('maintaining inverse edges', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Missing ends are written]] {level: unit}
+  // @lat: [[tests/inverse-edges#Missing ends are written]]
   // @tg: verifies:: [[openspec:schema-notes#Maintain inverse edges#Placement chosen at run time]]
   it('writes at the end of the note or into frontmatter when asked', () => {
     const end = vault({ 'Ada.md': '- worksAt:: [[Acme]]\n', 'Acme.md': 'Text.\n' });
@@ -52,6 +54,7 @@ describe('maintaining inverse edges', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Mismatches are fixed]] {level: unit}
+  // @lat: [[tests/inverse-edges#Mismatches are fixed]]
   // @tg: verifies:: [[openspec:schema-notes#Maintain inverse edges#Declared direction wins]]
   // @tg: verifies:: [[openspec:schema-notes#Maintain inverse edges#Last edited wins]]
   it('rewrites the properties of the losing end', () => {
@@ -66,6 +69,7 @@ describe('maintaining inverse edges', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Deleted edges are mirrored on request]] {level: unit}
+  // @lat: [[tests/inverse-edges#Deleted edges are mirrored on request]]
   // @tg: verifies:: [[openspec:schema-notes#Maintain inverse edges#Deletion mirrored]]
   it('removes a lone end only with deletions: mirror, deciding by the declared side or the last edit', () => {
     const files = { 'Ada.md': 'No longer works there.\n', 'Acme.md': '- hasEmployee:: [[Ada]]\n', 'Bob.md': '- worksAt:: [[Acme]]\n' };
@@ -96,7 +100,9 @@ describe('maintaining inverse edges', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Mismatches are fixed]] {level: unit}
+  // @lat: [[tests/inverse-edges#Mismatches are fixed]]
   // @tg: verifies:: [[tests/inverse-edges#Deleted edges are mirrored on request]] {level: unit}
+  // @lat: [[tests/inverse-edges#Deleted edges are mirrored on request]]
   // @tg: verifies:: [[openspec:schema-notes#Maintain inverse edges#Sources of truth chosen separately]]
   it('chooses the source of truth for properties and for deletions separately', () => {
     const files = { 'Ada.md': '- worksAt:: [[Acme]] {role: engineer}\n', 'Acme.md': '- hasEmployee:: [[Ada]] {role: manager}\n- hasEmployee:: [[Bob]]\n', 'Bob.md': '' };
@@ -118,6 +124,7 @@ describe('maintaining inverse edges', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Missing ends are written]] {level: unit}
+  // @lat: [[tests/inverse-edges#Missing ends are written]]
   it('limits a sync to the notes given, and leaves stale edits out', () => {
     const v = vault({ 'Ada.md': '- worksAt:: [[Acme]]\n', 'Bob.md': '- worksAt:: [[Acme]]\n', 'Acme.md': '' });
     const plan = v.sync({ only: new Set(['Bob.md']) });

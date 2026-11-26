@@ -49,6 +49,7 @@ describe('schema info', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Type details show inverse names]] {level: unit}
+  // @lat: [[tests/inverse-edges#Type details show inverse names]]
   it('lists an inverse name as an edge of the target type', () => {
     const person = type('Person', {});
     const company = type('Company', {});

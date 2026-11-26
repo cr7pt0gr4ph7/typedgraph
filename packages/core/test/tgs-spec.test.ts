@@ -204,6 +204,7 @@ describe('TGS AsciiDoc notes', () => {
 
   // @tg: verifies:: [[openspec:tgs-spec#TGS 0.7 published#0.6 note under 0.7]] {level: unit}
   // @tg: verifies:: [[tests/inverse-edges#TGS 0.7 published with inverse edges]] {level: unit}
+  // @lat: [[tests/inverse-edges#TGS 0.7 published with inverse edges]]
   it('publishes 0.7 with inverse edges, keeping 0.6 unchanged in the archive', () => {
     const spec = readFileSync(join(SPEC, 'SPEC.md'), 'utf8');
     expect(spec).toContain('# Typed Graph Schema (TGS) 0.7');

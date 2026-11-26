@@ -242,6 +242,7 @@ describe('SHACL import', () => {
 
 describe('SHACL inverse edges', () => {
   // @tg: verifies:: [[tests/inverse-edges#Inverse edges survive SHACL]] {level: unit}
+  // @lat: [[tests/inverse-edges#Inverse edges survive SHACL]]
   // @tg: verifies:: [[openspec:shacl-interop#Inverse edges in SHACL#Inverse round trip]]
   it('exports inverseEdge as tgs:inverseEdge and imports it back', () => {
     const fm = { tgs: '0.7', edgeTypes: { worksAt: { from: 'Person', to: 'Company', inverseEdge: 'hasEmployee' }, friendsWith: { inverseEdge: 'friendsWith' } } };

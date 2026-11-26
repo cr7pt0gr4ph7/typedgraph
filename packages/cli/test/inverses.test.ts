@@ -28,6 +28,7 @@ const VAULT = {
 };
 
 // @tg: verifies:: [[tests/inverse-edges#tg inverses writes on request]] {level: integration}
+// @lat: [[tests/inverse-edges#tg inverses writes on request]]
 it('lists missing ends as a dry run and writes them with --write', async () => {
   const dir = folder(VAULT);
   const dry = await tg(dir, 'inverses');
@@ -43,6 +44,7 @@ it('lists missing ends as a dry run and writes them with --write', async () => {
 });
 
 // @tg: verifies:: [[tests/inverse-edges#tg inverses writes on request]] {level: integration}
+// @lat: [[tests/inverse-edges#tg inverses writes on request]]
 it('takes the placement, the two sources of truth and deletions at run time', async () => {
   const dir = folder({ ...VAULT, 'Acme.md': '- hasEmployee:: [[Ada]] {role: manager}\n- hasEmployee:: [[Bob]]\n', 'Bob.md': '' });
   utimesSync(join(dir, 'Ada.md'), 1000, 1000);

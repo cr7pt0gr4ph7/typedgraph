@@ -24,6 +24,7 @@ function vault(files: Record<string, string>) {
 
 describe('inverse edge sync in the plugin', () => {
   // @tg: verifies:: [[tests/inverse-edges#Plugin writes inverse edges on command and on save]] {level: unit}
+  // @lat: [[tests/inverse-edges#Plugin writes inverse edges on command and on save]]
   it('writes the missing ends with the plugin settings, limited to the saved notes', async () => {
     const v = vault({ 'Ada.md': '- worksAt:: [[Acme]]\n', 'Bob.md': '- worksAt:: [[Acme]]\n', 'Acme.md': '# Acme\n' });
     const r = await syncInverseEdges(v.graph, v.set(), v.io, SETTINGS, new Set(['Ada.md']));
@@ -34,6 +35,7 @@ describe('inverse edge sync in the plugin', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Plugin writes inverse edges on command and on save]] {level: unit}
+  // @lat: [[tests/inverse-edges#Plugin writes inverse edges on command and on save]]
   it('runs once the saves pause, for the saved notes only, and not for its own writes', async () => {
     vi.useFakeTimers();
     const run = vi.fn(async (only: ReadonlySet<string>) => ({ actions: [], written: only.has('Ada.md') ? ['Acme.md'] : [] }));

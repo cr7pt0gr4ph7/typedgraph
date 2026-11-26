@@ -28,6 +28,7 @@ const note = (path: string, type: string, text = ''): NoteInput => ({ path, text
 
 describe('inverse edge declarations', () => {
   // @tg: verifies:: [[tests/inverse-edges#Inverse name read]] {level: unit}
+  // @lat: [[tests/inverse-edges#Inverse name read]]
   // @tg: verifies:: [[openspec:schema-notes#Inverse edge declarations#Inverse name declared]]
   // @tg: verifies:: [[openspec:schema-notes#Inverse edge declarations#Symmetric edge type declared]]
   it('reads inverseEdge, and a symmetric edge type names itself', () => {
@@ -41,12 +42,14 @@ describe('inverse edge declarations', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Inverse name read]] {level: unit}
+  // @lat: [[tests/inverse-edges#Inverse name read]]
   it('rejects an inverseEdge that is not a name, and older readers see an unknown key', () => {
     expect(readSchemaNote('Types/X.md', { edgeTypes: { a: { inverseEdge: ['b'] } } }).diagnostics.map((d) => d.message)).toEqual(["Edge type 'a': `inverseEdge` must be an edge type name"]);
     expect(readSchemaNote('Types/X.md', { tgs: '0.8', edgeTypes: { a: { inverseEdge: 'b', reach: 1 } } }).diagnostics.map((d) => d.code)).toEqual(['unknown-key']);
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Conflicting inverse names]] {level: unit}
+  // @lat: [[tests/inverse-edges#Conflicting inverse names]]
   // @tg: verifies:: [[openspec:schema-notes#Inverse edge declarations#Inverse name declared twice]]
   it('reports an inverse name declared differently as an edge type, or claimed twice, as a conflict', () => {
     const g = vault([
@@ -67,6 +70,7 @@ describe('inverse edge declarations', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Repeated inverse declarations]] {level: unit}
+  // @lat: [[tests/inverse-edges#Repeated inverse declarations]]
   // @tg: verifies:: [[openspec:schema-notes#Inverse edge declarations#Inverse name declared again the same way]]
   it('drops an edge type that repeats an inverse the same way, reversed, with a warning', () => {
     const g = vault([
@@ -88,6 +92,7 @@ describe('inverse edge declarations', () => {
 
 describe('canonical edge view', () => {
   // @tg: verifies:: [[tests/inverse-edges#Inverse name is the same edge]] {level: unit}
+  // @lat: [[tests/inverse-edges#Inverse name is the same edge]]
   // @tg: verifies:: [[openspec:graph-model#Canonical edge view#Inverse name turned around]]
   it('turns an edge written with the inverse name into the declared edge, reversed', () => {
     const g = vault([ontology, note('Ada.md', 'Person'), note('Acme.md', 'Company', '- hasEmployee:: [[Ada]] {role: engineer}')]);
@@ -100,6 +105,7 @@ describe('canonical edge view', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Both ends merge into one edge]] {level: unit}
+  // @lat: [[tests/inverse-edges#Both ends merge into one edge]]
   // @tg: verifies:: [[openspec:graph-model#Canonical edge view#Both ends merged]]
   // @tg: verifies:: [[openspec:schema-notes#Inverse edge validation#Ends disagree]]
   it('merges the two written ends of one edge, and reports properties that differ', () => {
@@ -117,6 +123,7 @@ describe('canonical edge view', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Both ends merge into one edge]] {level: unit}
+  // @lat: [[tests/inverse-edges#Both ends merge into one edge]]
   it('reports one end asserting an edge the other denies', () => {
     const g = vault([ontology, note('Ada.md', 'Person', '- worksAt:: [[Acme]]'), note('Acme.md', 'Company', '- -hasEmployee:: [[Ada]]')]);
     const view = canonicalView(g, schemasFromGraph(g, 'Types/'));
@@ -125,6 +132,7 @@ describe('canonical edge view', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Symmetric edges hold both ways]] {level: unit}
+  // @lat: [[tests/inverse-edges#Symmetric edges hold both ways]]
   // @tg: verifies:: [[openspec:graph-model#Canonical edge view#Symmetric ends merged]]
   it('merges a symmetric edge written from both ends and reads it from both', () => {
     const g = vault([ontology, note('Ada.md', 'Person', '- friendsWith:: [[Bob]]'), note('Bob.md', 'Person', '- friendsWith:: [[Ada]]'), note('Cy.md', 'Person', '- friendsWith:: [[Ada]]')]);
@@ -140,6 +148,7 @@ describe('canonical edge view', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Edges read from either end]] {level: unit}
+  // @lat: [[tests/inverse-edges#Edges read from either end]]
   // @tg: verifies:: [[openspec:schema-notes#Edges read from either end#Name from each end]]
   it('names an edge from each of its ends', () => {
     const sem = edgeSemantics(schemasFromGraph(vault([ontology]), 'Types/'));
@@ -166,6 +175,7 @@ describe('canonical edge view', () => {
 
 describe('validation with inverse edges', () => {
   // @tg: verifies:: [[tests/inverse-edges#Validation reads the declared direction]] {level: unit}
+  // @lat: [[tests/inverse-edges#Validation reads the declared direction]]
   // @tg: verifies:: [[openspec:schema-notes#Inverse edge validation#Endpoints checked in the declared direction]]
   it('checks endpoints, properties and counts on the declared direction', () => {
     const g = vault([
@@ -185,6 +195,7 @@ describe('validation with inverse edges', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Validation reads the declared direction]] {level: unit}
+  // @lat: [[tests/inverse-edges#Validation reads the declared direction]]
   // @tg: verifies:: [[openspec:schema-notes#Inverse edge validation#Other end satisfies a required edge]]
   it('lets an edge written from the other end satisfy a required edge', () => {
     const o: NoteInput = { ...ontology, frontmatter: { ...ontology.frontmatter, schemas: { Person: { edges: { worksAt: { target: 'Company', required: true } } }, Company: { edges: ['hasEmployee'] } } } };
@@ -193,6 +204,7 @@ describe('validation with inverse edges', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Lone ends reported]] {level: unit}
+  // @lat: [[tests/inverse-edges#Lone ends reported]]
   // @tg: verifies:: [[openspec:schema-notes#Inverse edge validation#Lone end reported]]
   it('reports an edge written at one end only, at that end', () => {
     const g = vault([
@@ -216,6 +228,7 @@ describe('cypher over inverse edges', () => {
   const run = (g: Graph, q: string) => new BuiltinEngine(g, () => ({ schemas: schemasFromGraph(g, 'Types/') })).run(q).rows;
 
   // @tg: verifies:: [[tests/inverse-edges#Queries match either name]] {level: unit}
+  // @lat: [[tests/inverse-edges#Queries match either name]]
   // @tg: verifies:: [[openspec:cypher-query#Inverse and symmetric patterns#Inverse name in a pattern]]
   it('matches the declared name and the inverse name, whichever was written', () => {
     const g = graph();
@@ -227,6 +240,7 @@ describe('cypher over inverse edges', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Queries match either name]] {level: unit}
+  // @lat: [[tests/inverse-edges#Queries match either name]]
   // @tg: verifies:: [[openspec:cypher-query#Inverse and symmetric patterns#Symmetric pattern]]
   it('matches a symmetric edge in both directions', () => {
     const g = graph();
@@ -236,6 +250,7 @@ describe('cypher over inverse edges', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Directed symmetric patterns noticed]] {level: unit}
+  // @lat: [[tests/inverse-edges#Directed symmetric patterns noticed]]
   // @tg: verifies:: [[openspec:cypher-query#Directed patterns on symmetric edges#Directed symmetric pattern noticed]]
   // @tg: verifies:: [[openspec:cypher-query#Directed patterns on symmetric edges#Undirected symmetric pattern quiet]]
   it('notes that a directed pattern on a symmetric edge type matches both ways', () => {
@@ -248,6 +263,7 @@ describe('cypher over inverse edges', () => {
   });
 
   // @tg: verifies:: [[tests/inverse-edges#Directed symmetric patterns match undirected]] {level: unit}
+  // @lat: [[tests/inverse-edges#Directed symmetric patterns match undirected]]
   // @tg: verifies:: [[openspec:cypher-query#Inverse and symmetric patterns#Symmetric pattern]]
   it('gives a directed pattern on a symmetric type the same rows as the undirected one', () => {
     const notes: NoteInput[] = [

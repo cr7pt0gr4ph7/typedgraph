@@ -169,6 +169,7 @@ describe('tg validate', () => {
 
 describe('inverse edges', () => {
   // @tg: verifies:: [[tests/inverse-edges#tg validate checks inverse edges]] {level: integration}
+  // @lat: [[tests/inverse-edges#tg validate checks inverse edges]]
   it('reports lone ends and mismatches as warnings and a conflicting inverse as an error', async () => {
     const dir = folder({
       'Types/Edges.md': '---\ntgs: "0.7"\nedgeTypes:\n  worksAt: {inverseEdge: hasEmployee}\n  employs: {inverseEdge: hasEmployee}\n---\n',

@@ -229,6 +229,7 @@ it('indexes AsciiDoc notes with backlinks and live updates, unless turned off', 
 });
 
 // @tg: verifies:: [[tests/inverse-edges#Backlinks named from the note's side]] {level: unit}
+// @lat: [[tests/inverse-edges#Backlinks named from the note's side]]
 // @tg: verifies:: [[openspec:vscode-extension#Backlinks named from the note's side#Incoming edge under its inverse name]]
 it('lists an incoming edge under the name it has at the open note', async () => {
   const { idx } = await index(['.'], {
