@@ -205,6 +205,31 @@ describe('cypher over inverse edges', () => {
     expect(engine.run('MATCH (a)-[:worksAt]->(b) RETURN b').notices).toBeUndefined();
   });
 
+  // @tg: verifies:: [[tests/inverse-edges#Directed symmetric patterns match undirected]] {level: unit}
+  // @tg: verifies:: [[openspec:cypher-query#Inverse and symmetric patterns#Symmetric pattern]]
+  it('gives a directed pattern on a symmetric type the same rows as the undirected one', () => {
+    const notes: NoteInput[] = [
+      { path: 'Types/E.md', text: '', frontmatter: { edgeTypes: { friendsWith: { inverseEdge: 'friendsWith' }, knows: {} } } },
+      // Both ends written (Bob and Cy), one end only (Ada to Bob), a self-loop (Ada) and an unrelated directed edge.
+      note('Ada.md', 'Person', '- friendsWith:: [[Bob]]\n- friendsWith:: [[Ada]]\n- knows:: [[Bob]]'),
+      note('Bob.md', 'Person', '- friendsWith:: [[Cy]]'),
+      note('Cy.md', 'Person', '- friendsWith:: [[Bob]]'),
+    ];
+    const g = vault(notes);
+    const engine = new BuiltinEngine(g, () => ({ schemas: schemasFromGraph(g, 'Types/') }));
+    const rows = (q: string) => engine.run(q).rows.map((r) => JSON.stringify(r)).sort();
+    const undirected = rows('MATCH (a)-[:friendsWith]-(b) RETURN a.title, b.title');
+    expect(undirected.length).toBeGreaterThan(0);
+    expect(rows('MATCH (a)-[:friendsWith]->(b) RETURN a.title, b.title')).toEqual(undirected);
+    expect(rows('MATCH (a)<-[:friendsWith]-(b) RETURN a.title, b.title')).toEqual(undirected);
+    expect(rows('MATCH (a)-[:friendsWith*1..3]->(b) RETURN a.title, b.title')).toEqual(rows('MATCH (a)-[:friendsWith*1..3]-(b) RETURN a.title, b.title'));
+    // In an alternation only the symmetric type is undirected; knows keeps its direction.
+    expect(rows('MATCH (a)-[:friendsWith|knows]->(b) RETURN a.title, b.title')).toEqual([...undirected, JSON.stringify(['Ada', 'Bob'])].sort());
+    // Without the ontology the pattern stays directed.
+    expect(new BuiltinEngine(g).run("MATCH ({title: 'Cy'})<-[:friendsWith]-(b) RETURN b.title").rows).toEqual([['Bob']]);
+    expect(new BuiltinEngine(g).run("MATCH ({title: 'Ada'})<-[:friendsWith]-(b) RETURN b.title").rows).toEqual([['Ada']]);
+  });
+
   it('keeps queries as before without schemas', () => {
     const g = graph();
     expect(new BuiltinEngine(g).run('MATCH ()-[r:hasEmployee]->() RETURN count(r)').rows).toEqual([[1]]);

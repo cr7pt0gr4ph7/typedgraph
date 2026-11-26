@@ -43,6 +43,10 @@ Endpoints, edge properties and counts are checked on the declared direction, and
 
 With the ontology, a Cypher pattern with the declared name or the inverse name matches the edge whichever end wrote it, and a symmetric edge matches both ways.
 
+## Directed symmetric patterns match undirected
+
+With the ontology, a directed pattern on a symmetric type returns the rows of the undirected one, single-hop and variable-length. In an alternation only the symmetric type is undirected; without the ontology the pattern stays directed.
+
 ## Directed symmetric patterns noticed
 
 A directed Cypher pattern on a symmetric edge type gets one notice per type, naming the undirected form; undirected patterns get none.
