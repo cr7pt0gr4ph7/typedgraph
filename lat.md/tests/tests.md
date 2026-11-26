@@ -37,6 +37,7 @@ Test specifications whose leaf sections must each be referenced by exactly one `
 - [[tg-vault]] — lat.md folder in a vault, export and import
 - [[okf-compat]] — OKF links, link edges, OKF export and conformance check
 - [[shacl-interop]] — SHACL export, import, round trip and the tg schema commands
+- [[owl-export]] — OWL 2 export of schemas, its DL declarations and loss report
 - [[tgs-spec]] — Typed Graph Schema conformance examples and JSON Schema
 - [[node-vault]] — shared Node loader listing and reading behaviors
 - [[graph-ui]] — shared renderer package behaviors

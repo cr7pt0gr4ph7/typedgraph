@@ -12,7 +12,8 @@ This directory defines the high-level concepts, business logic, and architecture
 - [[cli]] — `tg` CLI: lat.md replacement, annotations, code layer, OpenSpec trace, vault integration
 - [[asciidoc]] — AsciiDoc notes: properties in comments, typed edges, sections, links and host support
 - [[okf]] — Open Knowledge Format: reading bundles, OKF export and conformance check
-- [[shacl]] — SHACL export and import of schema notes and the open Typed Graph Schema spec
+- [[shacl]] — SHACL and OWL export, SHACL import of schema notes and the open Typed Graph Schema spec
+- [[owl-constraints]] — W3C OWL 2 rules the OWL export must respect: OWL 2 DL and open-world semantics
 - [[vscode]] — VS Code extension: typed backlinks, graph webview, tg init funnel
 - [[roadmap]] — shipped releases v0.1 to v0.11, assessment, focus and the phased plan from 0.12
 - [[tests]] — test specifications tied to test code

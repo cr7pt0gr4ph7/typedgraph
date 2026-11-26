@@ -1,0 +1,238 @@
+# Typed Graph Schema (TGS 0.7) exported as OWL 2
+@prefix : <urn:tgs:> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix schema: <https://schema.org/> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix tgs: <https://typedgraph.org/ns/tgs#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<urn:tgs:>
+    a owl:Ontology ;
+    owl:versionInfo "TGS 0.7" .
+
+tgs:edgeType
+    a owl:AnnotationProperty .
+
+tgs:edgesClosed
+    a owl:AnnotationProperty .
+
+tgs:kind
+    a owl:AnnotationProperty .
+
+tgs:note
+    a owl:AnnotationProperty .
+
+tgs:sections
+    a owl:AnnotationProperty .
+
+:Bot
+    a owl:Class ;
+    rdfs:label "Bot" ;
+    rdfs:isDefinedBy <urn:tgs:> ;
+    tgs:note "Types/People.md" ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :name ;
+        owl:maxCardinality "1"^^xsd:nonNegativeInteger
+    ] .
+
+:Person
+    a owl:Class ;
+    rdfs:label "Person" ;
+    rdfs:comment "A human being." ;
+    rdfs:isDefinedBy <urn:tgs:> ;
+    tgs:note "Types/People.md" ;
+    tgs:sections "{\"Background\":\"Where the person comes from.\"}" ;
+    tgs:edgesClosed true ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :name ;
+        owl:minCardinality "1"^^xsd:nonNegativeInteger
+    ] ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :name ;
+        owl:maxCardinality "1"^^xsd:nonNegativeInteger
+    ] ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :email ;
+        owl:maxCardinality "1"^^xsd:nonNegativeInteger
+    ] ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :status ;
+        owl:maxCardinality "1"^^xsd:nonNegativeInteger
+    ] ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :status ;
+        owl:allValuesFrom [
+            a rdfs:Datatype ;
+            owl:oneOf ( "active" "retired" )
+        ]
+    ] ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :since ;
+        owl:maxCardinality "1"^^xsd:nonNegativeInteger
+    ] ;
+    rdfs:subClassOf _:r0 ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :worksOn ;
+        owl:someValuesFrom :Project
+    ] ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :mentor ;
+        owl:allValuesFrom :Person
+    ] ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :mentor ;
+        owl:maxCardinality "1"^^xsd:nonNegativeInteger
+    ] ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :knows ;
+        owl:allValuesFrom [
+            a owl:Class ;
+            owl:unionOf ( :Person :Bot )
+        ]
+    ] ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :member ;
+        owl:minCardinality "1"^^xsd:nonNegativeInteger
+    ] .
+
+:Project
+    a owl:Class ;
+    rdfs:label "Project" ;
+    rdfs:isDefinedBy <urn:tgs:> ;
+    tgs:note "Types/People.md" ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :name ;
+        owl:minCardinality "1"^^xsd:nonNegativeInteger
+    ] ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :name ;
+        owl:maxCardinality "1"^^xsd:nonNegativeInteger
+    ] ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :status ;
+        owl:maxCardinality "1"^^xsd:nonNegativeInteger
+    ] .
+
+:Team
+    a owl:Class ;
+    rdfs:label "Team" ;
+    rdfs:isDefinedBy <urn:tgs:> .
+
+_:r0
+    a owl:Restriction ;
+    owl:onProperty :worksOn ;
+    owl:allValuesFrom :Project .
+
+[]
+    a owl:Axiom ;
+    owl:annotatedSource :Person ;
+    owl:annotatedProperty rdfs:subClassOf ;
+    owl:annotatedTarget _:r0 ;
+    rdfs:comment "The projects a person spends time on." .
+
+:email
+    a owl:ObjectProperty ;
+    rdfs:label "email" ;
+    rdfs:isDefinedBy <urn:tgs:> ;
+    rdfs:domain :Person .
+
+:knows
+    a owl:ObjectProperty ;
+    rdfs:label "knows" ;
+    rdfs:isDefinedBy <urn:tgs:> .
+
+:likes
+    a owl:ObjectProperty ;
+    rdfs:label "likes" ;
+    rdfs:isDefinedBy <urn:tgs:> .
+
+:member
+    a owl:ObjectProperty ;
+    rdfs:label "member" ;
+    rdfs:isDefinedBy <urn:tgs:> ;
+    rdfs:range :Team ;
+    tgs:note "Types/Edges.md" .
+
+:mentor
+    a owl:ObjectProperty ;
+    rdfs:label "mentor" ;
+    rdfs:isDefinedBy <urn:tgs:> .
+
+:worksOn
+    a owl:ObjectProperty ;
+    rdfs:label "worksOn" ;
+    rdfs:comment "Time spent on a project." ;
+    rdfs:isDefinedBy <urn:tgs:> ;
+    rdfs:domain [
+        a owl:Class ;
+        owl:unionOf ( :Person :Bot )
+    ] ;
+    rdfs:range :Project ;
+    tgs:note "Types/Edges.md" .
+
+:name
+    a owl:DatatypeProperty ;
+    rdfs:label "name" ;
+    rdfs:comment "What the thing is called." ;
+    rdfs:isDefinedBy <urn:tgs:> ;
+    rdfs:domain [
+        a owl:Class ;
+        owl:unionOf ( :Bot :Person :Project )
+    ] ;
+    rdfs:range xsd:string .
+
+:nicknames
+    a owl:DatatypeProperty ;
+    rdfs:label "nicknames" ;
+    rdfs:isDefinedBy <urn:tgs:> ;
+    rdfs:domain :Person ;
+    rdfs:range xsd:string ;
+    tgs:kind "list" .
+
+:since
+    a owl:DatatypeProperty ;
+    rdfs:label "since" ;
+    rdfs:isDefinedBy <urn:tgs:> ;
+    rdfs:domain :Person ;
+    rdfs:range xsd:date .
+
+:status
+    a owl:DatatypeProperty ;
+    rdfs:label "status" ;
+    rdfs:isDefinedBy <urn:tgs:> ;
+    rdfs:domain [
+        a owl:Class ;
+        owl:unionOf ( :Person :Project )
+    ] .
+
+:hours
+    a owl:AnnotationProperty ;
+    rdfs:label "hours" ;
+    rdfs:isDefinedBy <urn:tgs:> ;
+    rdfs:range xsd:decimal ;
+    tgs:edgeType :worksOn .
+
+:role
+    a owl:AnnotationProperty ;
+    rdfs:label "role" ;
+    rdfs:isDefinedBy <urn:tgs:> ;
+    rdfs:range xsd:string ;
+    tgs:edgeType :worksOn .

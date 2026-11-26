@@ -1,18 +1,18 @@
-# Typed Graph Schema (TGS) 0.6
+# Typed Graph Schema (TGS) 0.7
 
 | | |
 |---|---|
-| **Version** | 0.6 (published 2026-11-11; immutable) |
-| **Previous** | [0.5](../v0.5/) |
-| **This version** | `https://typedgraph.org/spec/tgs/v0.6/` |
-| **JSON Schema** | `https://typedgraph.org/spec/tgs/v0.6/tgs.schema.json` |
+| **Version** | 0.7 (published 2026-11-26; immutable) |
+| **Previous** | [0.6](../v0.6/) |
+| **This version** | `https://typedgraph.org/spec/tgs/v0.7/` |
+| **JSON Schema** | `https://typedgraph.org/spec/tgs/v0.7/tgs.schema.json` |
 | **Namespace** | `https://typedgraph.org/ns/tgs#` (prefix `tgs:`) |
 | **Latest version** | `https://typedgraph.org/spec/tgs/` |
 | **Editor** | Volodymyr Pavlyshyn |
 | **Source** | `spec/tgs/` in [github.com/Volland/typedgraph](https://github.com/Volland/typedgraph) |
 | **License** | Text: CC BY 4.0. JSON Schema and examples: MIT. |
 
-TGS describes the types of a knowledge graph kept as markdown or AsciiDoc notes: what properties a note of a type has, which typed links it may have to which other types, what properties those links carry, and what the parts inside a note mean: its headings and the XML elements it contains. Every declaration can explain itself in a `description`, written for people and for AI agents alike. A schema is ordinary YAML frontmatter in ordinary notes, so people can write and review it by hand, and it maps to and from W3C SHACL so the same ontology can be exchanged with RDF tools.
+TGS describes the types of a knowledge graph kept as markdown or AsciiDoc notes: what properties a note of a type has, which typed links it may have to which other types, what properties those links carry, and what the parts inside a note mean: its headings and the XML elements it contains. Every declaration can explain itself in a `description`, written for people and for AI agents alike. A schema is ordinary YAML frontmatter in ordinary notes, so people can write and review it by hand, and it maps to and from W3C SHACL so the same ontology can be exchanged with RDF tools. It also exports to OWL 2, so that reasoners and ontology editors can load what the types mean.
 
 TGS is independent of any one application. Typed Graph (an Obsidian plugin and CLI) is the reference implementation.
 
@@ -159,7 +159,7 @@ A note of a type has parts: headings (section 4.5) and **elements**, block-level
 ```yaml
 # Types/Decision.md
 ---
-tgs: "0.6"
+tgs: "0.7"
 schema:
   description: A choice that was made, with its reason and the alternatives rejected.
   sections:
@@ -243,7 +243,7 @@ Elements nest. A declaration says where a tag *means* something, not where it ma
 ```yaml
 # Types/Runbook.md
 ---
-tgs: "0.6"
+tgs: "0.7"
 schema:
   description: How to operate one part of the system when something goes wrong.
   elements:
@@ -486,7 +486,7 @@ A schema note MAY declare `tgs: "<major>.<minor>"`. A reader implementing versio
 - MUST report a note that declares another major version as `unsupported-version` and MUST NOT use its declarations;
 - MUST read notes without `tgs` as version 0.1.
 
-TGS 0.2 adds the `id` key (section 8.1) and the template tokens. TGS 0.3 adds AsciiDoc notes (section 2.1) and adds no schema key. TGS 0.4 adds `description` (section 4.1), `elements` and `sections` (sections 4.2 to 4.5) and document validation (section 4.8); unknown keys inside an element declaration are reported like those of a type. TGS 0.5 adds no key. It fixes how elements are declared and read: the attribute keys that have a meaning and the reserved `id` (section 4.3), the scope of nested declarations and counting per container (section 4.4), and one normal form for every shorthand (section 4.9). TGS 0.6 adds no key and changes no rule. It moves the identifiers of the specification to `https://typedgraph.org/`: the address of each version, the JSON Schema `$id`, and the `tgs:` namespace, which was `https://volland.github.io/obsigraph/ns/tgs#` in versions 0.1 to 0.5 (section 13.4). Every 0.1 note is a valid 0.2 note, every 0.2 note is a valid 0.3 note, every 0.3 note is a valid 0.4 note, every 0.4 note is a valid 0.5 note, and every 0.5 note is a valid 0.6 note.
+TGS 0.2 adds the `id` key (section 8.1) and the template tokens. TGS 0.3 adds AsciiDoc notes (section 2.1) and adds no schema key. TGS 0.4 adds `description` (section 4.1), `elements` and `sections` (sections 4.2 to 4.5) and document validation (section 4.8); unknown keys inside an element declaration are reported like those of a type. TGS 0.5 adds no key. It fixes how elements are declared and read: the attribute keys that have a meaning and the reserved `id` (section 4.3), the scope of nested declarations and counting per container (section 4.4), and one normal form for every shorthand (section 4.9). TGS 0.6 adds no key and changes no rule. It moves the identifiers of the specification to `https://typedgraph.org/`: the address of each version, the JSON Schema `$id`, and the `tgs:` namespace, which was `https://volland.github.io/obsigraph/ns/tgs#` in versions 0.1 to 0.5 (section 13.4). Every 0.1 note is a valid 0.2 note, every 0.2 note is a valid 0.3 note, every 0.3 note is a valid 0.4 note, every 0.4 note is a valid 0.5 note, every 0.5 note is a valid 0.6 note, and every 0.6 note is a valid 0.7 note. TGS 0.7 adds no key and changes no rule. It adds the OWL mapping (section 14), an OWL exporter conformance level (section 15) and the annotation term `tgs:edgeType`.
 
 Minor versions only add optional keys. A published version never changes.
 
@@ -582,7 +582,120 @@ An importer that writes notes SHOULD write one note per type by default (or grou
 
 For schemas written in TGS, export followed by import MUST reproduce the same types, edge types, properties, edges, identifiers, templates, visualization, descriptions, elements and sections. Exporting the result again yields the same RDF graph; the reference implementation produces byte-identical Turtle.
 
-## 14. Conformance
+## 14. OWL mapping
+
+TGS exports to the W3C Web Ontology Language (OWL 2) so that reasoners, ontology editors and knowledge-graph tools can load what the types and relations of a vault mean. An **OWL exporter** writes a schema set as one OWL 2 ontology in Turtle. The mapping is one way. SHACL (section 13) stays the format for exchanging and round-tripping schemas, and validation stays with section 9.
+
+The two mappings describe the same schema in different ways. SHACL says what a valid note looks like and is checked under the closed-world assumption: a missing required value is reported. OWL says what the terms mean and is read under the open-world assumption: from the same missing value a reasoner infers that the value exists but is unknown. Every rule below is faithful to TGS for notes that pass validation. On notes that fail it, OWL draws inferences where SHACL reports.
+
+### 14.1 Ontology and identifiers
+
+An exporter MUST use the identifiers of section 7, so that a SHACL export and an OWL export of one schema set name the same classes and properties. The ontology is `owl:Ontology` with an ontology IRI that defaults to the base IRI, and `owl:versionInfo "TGS <version>"`. An exporter MAY give it an `rdfs:label`, such as the name of the schema folder. Every class and property whose IRI starts with the base IRI has `rdfs:isDefinedBy` set to the ontology. A term outside the base IRI (`schema:Person`) is described but not defined by the ontology.
+
+The output MUST be in OWL 2 DL:
+
+- every IRI is declared exactly once, as `owl:Class`, `owl:ObjectProperty`, `owl:DatatypeProperty` or `owl:AnnotationProperty`;
+- every `tgs:` term the export uses is declared `owl:AnnotationProperty`, so reasoners ignore it;
+- no term of the `rdf:`, `rdfs:`, `owl:` or `sh:` vocabularies is declared or used as a class or property of the schema;
+- cardinalities are literals of type `xsd:nonNegativeInteger`.
+
+When one IRI would get two roles, for example a property name that is both a frontmatter property and an edge property, the exporter MUST keep one role in the order class, object property, datatype property, annotation property. It MUST NOT write the axioms of the role it drops, and it MUST report `owl-property-conflict` (section 14.7).
+
+### 14.2 Types
+
+| TGS | OWL | SHACL (section 13) |
+|---|---|---|
+| type `Person` | `:Person a owl:Class` | a node shape with `sh:targetClass :Person` |
+| type name | `rdfs:label` | `sh:name` |
+| `description` | `rdfs:comment` | `sh:description` |
+| a type named only as a target or endpoint (`to: Team`) | `owl:Class` with `rdfs:label` | `sh:class` only |
+| schema note, `template`, template body, `visualization`, `sections`, `elements` | the annotations of section 13.4 on the class | the same annotations on the node shape |
+
+An exporter MUST NOT write `owl:disjointWith` or `owl:disjointUnionOf`. A note can carry several types (section 10), and disjoint classes would make such a note inconsistent.
+
+### 14.3 Properties
+
+A SHACL property shape belongs to one node shape. An OWL property is a global term, so an exporter MUST write one property per property IRI. That property merges every type that declares it:
+
+| TGS | OWL |
+|---|---|
+| kind `text`, `number`, `boolean`, `date`, `datetime`, `list` | `owl:DatatypeProperty` with `rdfs:range` the XSD datatype of section 5.2 |
+| kind `link` | `owl:ObjectProperty` with no range |
+| kind `list` (every declaration) | also `tgs:kind "list"` |
+| declared by types `A` and `B` | `rdfs:domain [ a owl:Class ; owl:unionOf ( :A :B ) ]`; `rdfs:domain :A` for one type |
+| declarations with different datatypes | no `rdfs:range`; reported as `owl-range-conflict` |
+| name, `description` | `rdfs:label`, `rdfs:comment` (one per distinct value) |
+
+Constraints are type-local in TGS, so they become restrictions on the class of the declaring type, `:A rdfs:subClassOf [ a owl:Restriction ; owl:onProperty :p ; … ]`, and not global axioms such as `owl:FunctionalProperty`:
+
+| TGS on type `A` | Restriction on `:A` | SHACL |
+|---|---|---|
+| `required: true` | `owl:minCardinality 1` | `sh:minCount 1` |
+| not `many` | `owl:maxCardinality 1` | `sh:maxCount 1` |
+| `values` of a datatype property | `owl:allValuesFrom [ a rdfs:Datatype ; owl:oneOf ( … ) ]` | `sh:in ( … )` |
+| `values` of a `link` property | not exported; `owl-link-values` | `sh:in ( … )` |
+| `default` | not exported; `owl-default` | `sh:defaultValue` or `tgs:default` |
+
+### 14.4 Edge types
+
+| TGS | OWL | SHACL (section 13.3) |
+|---|---|---|
+| edge type `worksAt` | `owl:ObjectProperty` | an edge shape over `rdf:Statement` with `rdf:predicate sh:hasValue :worksAt` |
+| `from` | `rdfs:domain`, a union for several types | `sh:class` on `rdf:subject` |
+| `to` | `rdfs:range`, a union for several types | `sh:class` on `rdf:object` |
+| name, `description` | `rdfs:label`, `rdfs:comment` | `sh:name`, `sh:description` |
+| schema note, `visualization` | `tgs:note`, `tgs:visualization` | the same |
+
+`rdfs:domain` and `rdfs:range` are inference rules. An edge from a note that is not a `from` type makes a reasoner infer that the note has that type. It does not report the edge. An edge named in a type's `edges` without an edge type declaration is an `owl:ObjectProperty` with no domain or range.
+
+### 14.5 Edges of a type
+
+Each entry of a type's `edges` becomes restrictions on the class of that type, so a target that holds for one source type does not become a global range:
+
+| Entry on type `A` | Restriction on `:A` | SHACL (section 13.2) |
+|---|---|---|
+| target types | `owl:allValuesFrom` the target class, or a union for several | `sh:class` or `sh:or` |
+| any target | none | `sh:nodeKind sh:IRI ; tgs:edge true` |
+| `required: true` with target types | `owl:someValuesFrom` the same class expression | `sh:minCount 1` |
+| `required: true`, any target | `owl:minCardinality 1` | `sh:minCount 1` |
+| `many: false` | `owl:maxCardinality 1` | `sh:maxCount 1` |
+| `edges` declared | `tgs:edgesClosed true` on the class; `owl-closed-edges` | `tgs:edgesClosed true` on the node shape |
+
+The `description` of an entry annotates the axiom of its first restriction, `[] a owl:Axiom ; owl:annotatedSource :A ; owl:annotatedProperty rdfs:subClassOf ; owl:annotatedTarget _:r ; rdfs:comment "…"`, where `_:r` is that restriction. An entry without a restriction has no axiom to annotate. Its description is reported as `owl-edge-description`.
+
+The allow-list of a type is not written as `owl:maxCardinality 0` for the other edge types. Under the open-world assumption one stray edge would make the whole ontology inconsistent, and edges that no schema declares would still be allowed.
+
+### 14.6 Edge properties
+
+OWL has no properties on a property assertion. The reification shape SHACL uses (section 13.3) is not available here, because `rdf:Statement`, `rdf:subject` and `rdf:object` are reserved in OWL 2 DL. Each edge property is therefore an `owl:AnnotationProperty`, which is how OWL 2 annotates an assertion through `owl:Axiom`:
+
+| TGS | OWL |
+|---|---|
+| property of edge type `worksAt` | `owl:AnnotationProperty` with `tgs:edgeType :worksAt` (one per edge type) |
+| kind other than `link` | `rdfs:range` the XSD datatype of section 5.2, which carries no OWL semantics |
+| kind `list` | also `tgs:kind "list"` |
+| name, `description` | `rdfs:label`, `rdfs:comment` |
+| `required`, `values` | not exported; `owl-edge-property-constraint` |
+| `default` | not exported; `owl-default` |
+
+### 14.7 Loss report
+
+An exporter MUST report what it does not express in OWL. Each loss has a code, a subject (a type name, `Type.property`, `EdgeType.property` or a compact IRI) and a message:
+
+| Code | Reported for |
+|---|---|
+| `owl-closed-edges` | a type that declares `edges` |
+| `owl-default` | a property or edge property with a `default` |
+| `owl-edge-description` | the description of an edge entry without a restriction |
+| `owl-edge-property-constraint` | `required` or `values` on an edge property |
+| `owl-foreign-term` | a class or property IRI outside the base IRI, because the ontology makes statements about another vocabulary |
+| `owl-link-values` | `values` on a `link` property |
+| `owl-property-conflict` | an IRI with two roles (section 14.1) |
+| `owl-range-conflict` | a property declared with different datatypes |
+
+The report does not change the ontology. An exporter SHOULD produce byte-identical output for the same schema set. The reference implementation orders declarations by IRI and restrictions by declaration order.
+
+## 15. Conformance
 
 | Level | Requirements |
 |---|---|
@@ -590,22 +703,25 @@ For schemas written in TGS, export followed by import MUST reproduce the same ty
 | **Validator** | Reader, plus section 9 |
 | **SHACL exchanger** | Validator, plus section 13 |
 | **Document validator** | Validator, plus sections 4.2 to 4.6 and 4.8 |
+| **OWL exporter** | Reader, plus section 14 |
 
 The `examples/` folder next to this document contains conformance cases. Each case has a `vault/` folder (schema folder `Types/`, base IRI `urn:tgs:`) and an `expected.json` with:
 
 - `types` and `edgeTypes`: the declarations a reader must produce, with defaults applied and identifiers expanded to IRIs;
 - `diagnostics`: what a validator must report, each as `path`, `line` (the 1-based line of the edge, or null for a note-level diagnostic) and `diagnostic` (a name from section 4.8 or 9), in any order;
-- `invalidAgainstJsonSchema`: the schema notes that must fail the JSON Schema of section 15.
+- `invalidAgainstJsonSchema`: the schema notes that must fail the JSON Schema of section 16.
 
-SHACL cases also have a `shapes.ttl` that an exporter's output must be isomorphic to.
+SHACL cases also have a `shapes.ttl` that an exporter's output must be isomorphic to. Cases with an `ontology.ttl` hold the ontology an OWL exporter's output must be isomorphic to (base IRI and ontology IRI `urn:tgs:`, no ontology label).
 
-## 15. JSON Schema
+## 16. JSON Schema
 
-`tgs.schema.json` (JSON Schema draft 2020-12) validates the TGS keys of a schema note's frontmatter. It is strict about TGS 0.6 keys and leaves `visualization` and all non-TGS keys open. Notes declaring a newer minor version may not validate against it.
+`tgs.schema.json` (JSON Schema draft 2020-12) validates the TGS keys of a schema note's frontmatter. It is strict about TGS 0.7 keys and leaves `visualization` and all non-TGS keys open. Notes declaring a newer minor version may not validate against it.
 
-## 16. References
+## 17. References
 
 - W3C, *Shapes Constraint Language (SHACL)*, https://www.w3.org/TR/shacl/
+- W3C, *OWL 2 Web Ontology Language: Structural Specification and Functional-Style Syntax*, https://www.w3.org/TR/owl2-syntax/
+- W3C, *OWL 2 Web Ontology Language: Mapping to RDF Graphs*, https://www.w3.org/TR/owl2-mapping-to-rdf/
 - W3C, *RDF 1.1 Turtle*, https://www.w3.org/TR/turtle/
 - W3C, *RDF 1.1 Concepts*, reification vocabulary, https://www.w3.org/TR/rdf11-mt/#reification
 - *Schema.org*, https://schema.org/

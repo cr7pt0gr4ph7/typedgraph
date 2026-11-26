@@ -2,6 +2,23 @@
 
 All notable changes to the Typed Graph plugin, the `tg` CLI, the core library and the sidecar. The VS Code extension keeps its own [changelog](packages/vscode/CHANGELOG.md).
 
+## Unreleased
+
+Schemas export to OWL.
+
+### Added
+
+- **OWL export of schemas.** `tg schema export ontology.ttl --format owl [--ontology-iri iri]` and the plugin command *Export schemas as OWL* write the schema folder as one OWL 2 DL ontology in Turtle, with the same IRIs as the SHACL export. Reasoners, Protégé and other ontology tools can load it.
+  - Types become `owl:Class`es. A frontmatter property becomes one datatype or object property with a union domain, and its `required`, single-value and `values` constraints become restrictions on the declaring class.
+  - Edge types become object properties with `rdfs:domain` and `rdfs:range`. The edges of a type become `allValuesFrom`, `someValuesFrom` and cardinality restrictions. Edge properties become annotation properties tied to their edge with the new term `tgs:edgeType`.
+  - A loss report names what OWL cannot express: allowed-edge lists, defaults, constraints on edge properties, terms of other vocabularies, conflicting kinds and roles. The CLI prints it, `--json` returns it as `losses`, and the plugin shows it in a dialog.
+  - The export is one way. Use SHACL to round-trip schemas, and `tg validate` or the plugin to validate notes.
+- **TGS 0.7.** The specification adds the OWL mapping (section 14), an OWL exporter conformance level, the term `tgs:edgeType` and conformance example `09-owl`, with an expected `ontology.ttl` for examples 05 and 09. It adds no key and changes no rule. 0.6 is archived unchanged.
+
+### Changed
+
+- The header comment of SHACL exports names TGS 0.7. The shapes themselves are unchanged.
+
 ## 0.31.0 — 2026-11-24
 
 OpenFlow joins the spec frameworks `tg` traces.

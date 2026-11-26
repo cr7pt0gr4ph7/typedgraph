@@ -1,12 +1,13 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { DEFAULT_SCHEMA_FOLDER, normalizeFolder, readSchemaNote, schemaSetFromNotes, splitFrontmatter } from '@obsigraph/core';
+import { exportOwl } from '@obsigraph/core/src/owl.js';
 import { exportShacl, importShacl, planImport, type ExistingNote } from '@obsigraph/core/src/shacl.js';
 import { parse as parseYaml } from 'yaml';
 import { EXIT_ERROR, EXIT_FINDINGS, EXIT_OK, register, type Command, type Ctx } from '../cli.mjs';
 
 const USAGE = [
-  'schema export <out.ttl> [--format shacl] [--vault dir] [--schema-folder Types] [--base iri]',
+  'schema export <out.ttl> [--format shacl|owl] [--vault dir] [--schema-folder Types] [--base iri] [--ontology-iri iri]',
   'schema import <file.ttl> [--vault dir] [--schema-folder Types] [--layout auto|per-type|single] [--into name] [--force] [--base iri]',
 ].join('\n       tg ');
 
@@ -36,31 +37,43 @@ const str = (flags: Map<string, string | true>, k: string) => (typeof flags.get(
 // @tg: implements:: [[shacl#Commands]] {since: "2026-10-06"}
 // @lat: [[shacl#Commands]]
 // @tg: implements:: [[openspec:shacl-interop#Export schemas as SHACL]]
+// @tg: implements:: [[openspec:owl-export#Export schemas as OWL]]
+// @tg: implements:: [[openspec:owl-export#Loss report]]
 function runExport(ctx: Ctx, outArg: string, vault: string, folder: string, flags: Map<string, string | true>): number {
   const format = str(flags, 'format') ?? 'shacl';
-  if (format !== 'shacl') {
-    ctx.err(`unknown format "${format}"; expected shacl\n`);
+  if (format !== 'shacl' && format !== 'owl') {
+    ctx.err(`unknown format "${format}"; expected shacl or owl\n`);
+    return EXIT_ERROR;
+  }
+  if (format === 'shacl' && flags.has('ontology-iri')) {
+    ctx.err('--ontology-iri applies to --format owl only\n');
     return EXIT_ERROR;
   }
   const notes = readSchemaNotes(vault, folder);
   const set = schemaSetFromNotes(notes.map((n) => readSchemaNote(n.path, n.frontmatter)));
   const bodies = new Map(notes.map((n) => [n.path, splitFrontmatter(n.text).body]));
-  const ttl = exportShacl(set, { base: str(flags, 'base'), body: (p) => bodies.get(p) ?? null });
+  const body = (p: string) => bodies.get(p) ?? null;
+  const owl = format === 'owl' ? exportOwl(set, { base: str(flags, 'base'), ontologyIri: str(flags, 'ontology-iri'), label: folder.replace(/\/$/, ''), body }) : null;
+  const ttl = owl ? owl.turtle : exportShacl(set, { base: str(flags, 'base'), body });
   const out = resolve(ctx.cwd, outArg);
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, ttl);
   const counts = { types: set.schemas.size, edgeTypes: set.edgeTypes.size };
   if (ctx.json) {
-    ctx.out(`${JSON.stringify({ out, format, ...counts, diagnostics: set.diagnostics }, null, 2)}\n`);
+    ctx.out(`${JSON.stringify({ out, format, ...counts, diagnostics: set.diagnostics, ...(owl ? { losses: owl.losses } : {}) }, null, 2)}\n`);
     return EXIT_OK;
   }
   const lines =
     counts.types + counts.edgeTypes === 0
       ? [`No types found in ${folder}; wrote prefixes only to ${relative(ctx.cwd, out)}.`]
-      : [`Exported ${counts.types} type${counts.types === 1 ? '' : 's'} and ${counts.edgeTypes} edge type${counts.edgeTypes === 1 ? '' : 's'} from ${folder} to ${relative(ctx.cwd, out)} as SHACL.`];
+      : [`Exported ${counts.types} type${counts.types === 1 ? '' : 's'} and ${counts.edgeTypes} edge type${counts.edgeTypes === 1 ? '' : 's'} from ${folder} to ${relative(ctx.cwd, out)} as ${owl ? 'OWL' : 'SHACL'}.`];
   if (set.diagnostics.length) {
     lines.push('', `${set.diagnostics.length} schema diagnostic${set.diagnostics.length === 1 ? '' : 's'}:`);
     for (const d of set.diagnostics) lines.push(`  ${d.path}: ${d.message}`);
+  }
+  if (owl) {
+    lines.push('', owl.losses.length ? `Loss report (${owl.losses.length} thing${owl.losses.length === 1 ? '' : 's'} OWL does not express):` : 'Loss report: everything was expressed in OWL.');
+    for (const l of owl.losses) lines.push(`  ${l.code} ${l.subject}: ${l.message}`);
   }
   ctx.out(`${lines.join('\n')}\n`);
   return EXIT_OK;
@@ -117,9 +130,9 @@ function runImport(ctx: Ctx, fileArg: string, vault: string, folder: string, fla
 
 export const schema: Command = {
   name: 'schema',
-  summary: 'Export schema notes as SHACL or import SHACL shapes into schema notes',
+  summary: 'Export schema notes as SHACL or OWL, or import SHACL shapes into schema notes',
   usage: USAGE,
-  flags: { vault: 'string', 'schema-folder': 'string', format: 'string', base: 'string', layout: 'string', into: 'string', force: 'bool' },
+  flags: { vault: 'string', 'schema-folder': 'string', format: 'string', base: 'string', 'ontology-iri': 'string', layout: 'string', into: 'string', force: 'bool' },
   noProject: true,
   run(ctx, args, flags) {
     const [sub, target] = args;
