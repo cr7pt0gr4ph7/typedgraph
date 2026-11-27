@@ -54,9 +54,9 @@ In the Obsidian plugin both options are settings, "Plain links as links_to edges
 
 ## Plugin settings tabs
 
-The Obsidian plugin defines its settings twice: declaratively in [[packages/plugin/src/settings.ts#ObsigraphSettingTab#getSettingDefinitions]] for Obsidian 1.13+, and in the legacy [[packages/plugin/src/settings.ts#ObsigraphSettingTab#display]] for older versions.
+The Obsidian plugin defines its settings once, declaratively in [[packages/plugin/src/settings.ts#ObsigraphSettingTab#getSettingDefinitions]], which Obsidian 1.13+ renders itself.
 
-Both show the same headings, names, descriptions, order and control types. Older Obsidian has no number or folder control, so the legacy tab uses a number-only text box and a search box that suggests vault folders. A unit test renders both and compares them ([[tests/edge-settings#Legacy tab matches the declarative settings]]).
+For older versions [[packages/plugin/src/settings.ts#ObsigraphSettingTab#display]] walks the same definitions: each group heading becomes a heading `Setting`, each definition a `Setting` with its name, description and control, and a custom `render` is called on the new `Setting`. Both tabs save through `setControlValue()`, so a change has the same side effects. Older Obsidian has no number or folder control, so the legacy tab uses a number-only text box, checked against the declared range and `validate`, and a search box that suggests vault folders. A unit test renders both and compares them ([[tests/edge-settings#Legacy tab matches the declarative settings]]).
 
 ## Indexed folders
 

@@ -6,7 +6,7 @@ All notable changes to the Typed Graph plugin, the `tg` CLI, the core library an
 
 ### Changed
 
-- **One settings layout for every Obsidian version.** The settings tab used before Obsidian 1.13 now has the same headings, settings, order, descriptions and control types as the 1.13+ settings. Numbers are entered in number boxes, and the schema folder suggests vault folders. The style settings show their JSON examples in both. A test keeps the two in step.
+- **One settings layout for every Obsidian version.** The settings tab used before Obsidian 1.13 is now built from the 1.13+ setting definitions, so it has the same headings, settings, order, descriptions and control types. Numbers are entered in number boxes, and the schema folder suggests vault folders. The style settings show their JSON examples in both. The schema folder and sidecar URL are trimmed in both, as the old tab did.
 
 ## 0.31.0 — 2026-11-24
 

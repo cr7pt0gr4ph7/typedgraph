@@ -3,15 +3,19 @@ import { describe, expect, it, vi } from 'vitest';
 /** What a rendered setting shows: a heading, or a name, description and the controls it holds. */
 type Rendered = { heading: string } | { name: string; desc: string; controls: string[] };
 
-const rendered = vi.hoisted(() => [] as { heading: boolean; name: string; desc: string; controls: string[] }[]);
+const rendered = vi.hoisted(() => [] as { heading: boolean; name: string; desc: string; controls: string[]; changes: ((v: unknown) => unknown)[] }[]);
 
 vi.mock('obsidian', () => {
   const component = () => {
     const c = {
       inputEl: { type: 'text', rows: 0, min: '', max: '', addClass() {} },
+      change: undefined as ((v: unknown) => unknown) | undefined,
       setValue: () => c,
       setPlaceholder: () => c,
-      onChange: () => c,
+      onChange: (cb: (v: unknown) => unknown) => {
+        c.change = cb;
+        return c;
+      },
       addOptions: () => c,
     };
     return c;
@@ -21,6 +25,7 @@ vi.mock('obsidian', () => {
     name = '';
     desc = '';
     controls: string[] = [];
+    changes: ((v: unknown) => unknown)[] = [];
     descEl = { createDiv: () => ({ setText() {} }) };
     constructor() {
       rendered.push(this);
@@ -42,6 +47,7 @@ vi.mock('obsidian', () => {
       cb(c);
       // A text box typed as number or password is the legacy stand-in for those controls.
       this.controls.push(kind === 'text' && c.inputEl.type !== 'text' ? c.inputEl.type : kind);
+      if (c.change) this.changes.push(c.change);
       return this;
     }
     addText(cb: (c: unknown) => unknown) {
@@ -173,5 +179,23 @@ describe('settings tab', () => {
     t.display();
     const legacy: Rendered[] = rendered.map((s) => (s.heading ? { heading: s.name } : { name: s.name, desc: s.desc, controls: s.controls }));
     expect(legacy).toEqual(modern);
+  });
+
+  it('saves a legacy number box only for a number within the declared range, with the declarative side effects', async () => {
+    const { t, plugin, refresh } = tab();
+    rendered.length = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (t as any).containerEl = { empty() {}, createDiv: () => ({ setText() {} }) };
+    t.display();
+    const change = (name: string) => rendered.find((s) => s.name === name)!.changes[0]!;
+    for (const v of ['', 'x', '0', '51', '2.5']) await change('Maximum path depth')(v);
+    expect(plugin.settings.maxPathDepth).toBe(DEFAULT_SETTINGS.maxPathDepth);
+    await change('Maximum path depth')('7');
+    expect(plugin.settings.maxPathDepth).toBe(7);
+    await change('Code folder')(' src ');
+    expect(plugin.settings.codeRoot).toBe('src');
+    expect(refresh).toHaveBeenCalledTimes(1);
+    await change('Schema folder')('  ');
+    expect(plugin.settings.schemaFolder).toBe(DEFAULT_SETTINGS.schemaFolder);
   });
 });

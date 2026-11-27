@@ -1,4 +1,4 @@
-import { AbstractInputSuggest, App, PluginSettingTab, Setting, type SettingDefinitionItem, type TextComponent, type TFolder } from 'obsidian';
+import { AbstractInputSuggest, App, PluginSettingTab, Setting, type SettingControl, type SettingDefinitionItem, type SettingGroup, type SettingGroupItem, type TFolder } from 'obsidian';
 import type ObsigraphPlugin from './main';
 import { DEFAULT_BASE_IRI, DEFAULT_MAX_PATH_DEPTH, DEFAULT_SCHEMA_FOLDER, type CodeMode, type EdgeStyle, type NodeStyle } from '@obsigraph/core';
 import { parseEdgeStyles, parseTypeStyles } from './render/styles';
@@ -71,28 +71,20 @@ export const DEFAULT_SETTINGS: ObsigraphSettings = {
 const INDEX_FOLDERS_DESC = 'Only notes in these folders are indexed, one folder per line. Leave empty to index the whole vault. The schema folder is always indexed.';
 const EXCLUDE_FOLDERS_DESC = 'Notes in these folders are not indexed, one folder per line. Links into them end at stub nodes, as links to missing notes do. Re-indexes the vault when changed.';
 const OBSIDIAN_EXCLUDED_DESC = "Also leave out the files hidden by Obsidian's Files and links › Excluded files option. Re-indexes the vault when changed.";
-const TYPE_STYLES_DESC = 'JSON keyed by type label: color, shape, icon (Lucide name) and label (property shown instead of the title). Example: {"Person": {"color": "#59a14f", "shape": "round-rectangle", "icon": "user"}}.';
-const EDGE_STYLES_DESC = 'JSON keyed by edge type: color and line (solid, dashed, dotted). Negative edges are dashed red unless set here. Example: {"knows": {"color": "orange"}}.';
-
-/** The legacy stand-in for a declarative `number` control: a text box that takes numbers. */
-function numberInput(t: TextComponent, min: number, max: number): void {
-  t.inputEl.type = 'number';
-  t.inputEl.min = String(min);
-  t.inputEl.max = String(max);
-}
 
 /** The legacy stand-in for a declarative `folder` control: suggests vault folders as you type. */
 class FolderSuggest extends AbstractInputSuggest<TFolder> {
   constructor(
     private readonly vaultApp: App,
     inputEl: HTMLInputElement,
+    private readonly filter?: (folder: TFolder) => boolean,
   ) {
     super(vaultApp, inputEl);
   }
 
   protected getSuggestions(query: string): TFolder[] {
     const q = query.toLowerCase();
-    return this.vaultApp.vault.getAllFolders().filter((f) => f.path.toLowerCase().includes(q));
+    return this.vaultApp.vault.getAllFolders().filter((f) => f.path.toLowerCase().includes(q) && (this.filter?.(f) ?? true));
   }
 
   renderSuggestion(folder: TFolder, el: HTMLElement): void {
@@ -109,220 +101,87 @@ export class ObsigraphSettingTab extends PluginSettingTab {
     super(app, plugin);
   }
 
-  /** Settings for Obsidian before 1.13; mirrors getSettingDefinitions() heading for heading and setting for setting. */
+  /** Settings for Obsidian before 1.13, built from getSettingDefinitions() so both list the same settings. */
   // @tg: implements:: [[openspec:graph-model#Legacy settings match the declarative settings]] {since: "2026-11-27"}
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
+    for (const item of this.getSettingDefinitions()) this.renderItem(containerEl, item);
+  }
 
-    new Setting(containerEl).setName('Queries').setHeading();
+  /** A group becomes a heading followed by its items. Pages and actions are not used by this plugin. */
+  private renderItem(el: HTMLElement, item: SettingDefinitionItem | SettingGroupItem): void {
+    if ('type' in item) {
+      if (item.type === 'page') return;
+      if (item.heading) new Setting(el).setName(item.heading).setHeading();
+      for (const child of item.items ?? []) this.renderItem(el, child);
+      return;
+    }
+    if (!('name' in item) || 'action' in item) return;
+    const setting = new Setting(el).setName(item.name);
+    if (item.desc !== undefined) setting.setDesc(item.desc);
+    // Before 1.13 there is no SettingGroup; this plugin's render functions do not use it.
+    if ('render' in item && item.render) item.render(setting, undefined as unknown as SettingGroup);
+    else if ('control' in item && item.control) this.renderControl(setting, item.control);
+  }
 
-    new Setting(containerEl)
-      .setName('Default query backend')
-      .setDesc('Where blocks run unless they set a backend line. Built-in runs inside the app; the sidecar option runs full read queries on its graph database.')
-      .addDropdown((d) =>
-        d
-          .addOptions({ builtin: 'Built-in', ladybug: 'Ladybug (sidecar)' })
-          .setValue(this.plugin.settings.defaultBackend)
-          .onChange(async (v) => {
-            this.plugin.settings.defaultBackend = v === 'ladybug' ? 'ladybug' : 'builtin';
-            await this.plugin.saveSettings();
-          }),
-      );
-
-    new Setting(containerEl)
-      .setName('Maximum graph elements')
-      .setDesc('Graph results with more nodes plus edges than this are shown as a table instead.')
-      .addText((t) => {
-        numberInput(t, 1, 100000);
-        t.setValue(String(this.plugin.settings.maxElements)).onChange(async (v) => {
-          const n = Number(v);
-          if (Number.isInteger(n) && n > 0) {
-            this.plugin.settings.maxElements = n;
-            await this.plugin.saveSettings();
-          }
+  /** The legacy component for each declarative control, saving through setControlValue() like the declarative tab. */
+  private renderControl(setting: Setting, control: SettingControl): void {
+    const { key } = control;
+    const value = this.getControlValue(key);
+    const save = async (v: unknown) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (control.validate && (await (control.validate as (v: any) => unknown)(v))) return;
+      await this.setControlValue(key, v);
+    };
+    switch (control.type) {
+      case 'toggle':
+        setting.addToggle((t) => t.setValue(Boolean(value)).onChange(save));
+        break;
+      case 'dropdown':
+        setting.addDropdown((d) => d.addOptions(control.options).setValue(String(value)).onChange(save));
+        break;
+      case 'text':
+        setting.addText((t) => t.setPlaceholder(control.placeholder ?? '').setValue(String(value ?? '')).onChange(save));
+        break;
+      case 'textarea':
+        setting.addTextArea((t) => {
+          if (control.rows) t.inputEl.rows = control.rows;
+          t.setPlaceholder(control.placeholder ?? '').setValue(String(value ?? '')).onChange(save);
         });
-      });
-
-    new Setting(containerEl)
-      .setName('Maximum path depth')
-      .setDesc('Unbounded variable-length patterns stop at this many hops.')
-      .addText((t) => {
-        numberInput(t, 1, 50);
-        t.setValue(String(this.plugin.settings.maxPathDepth)).onChange(async (v) => {
-          const n = Number(v);
-          if (Number.isInteger(n) && n > 0 && n <= 50) {
-            this.plugin.settings.maxPathDepth = n;
-            await this.plugin.saveSettings();
-          }
+        break;
+      case 'number':
+        // Older Obsidian has no number control: a text box that takes numbers stands in for it.
+        setting.addText((t) => {
+          t.inputEl.type = 'number';
+          if (control.min !== undefined) t.inputEl.min = String(control.min);
+          if (control.max !== undefined) t.inputEl.max = String(control.max);
+          t.setPlaceholder(control.placeholder ?? '')
+            .setValue(String(value ?? ''))
+            .onChange((v) => {
+              const n = Number(v);
+              if (v.trim() === '' || !Number.isFinite(n)) return;
+              if ((control.min !== undefined && n < control.min) || (control.max !== undefined && n > control.max)) return;
+              return save(n);
+            });
         });
-      });
-
-    new Setting(containerEl)
-      .setName('Refresh delay (ms)')
-      .setDesc('How long query blocks wait after a vault change before re-running.')
-      .addText((t) => {
-        numberInput(t, 0, 60000);
-        t.setValue(String(this.plugin.settings.refreshDebounceMs)).onChange(async (v) => {
-          const n = Number(v);
-          if (Number.isInteger(n) && n >= 0) {
-            this.plugin.settings.refreshDebounceMs = n;
-            await this.plugin.saveSettings();
-          }
+        break;
+      case 'folder':
+        // Older Obsidian has no folder control: a search box that suggests vault folders stands in for it.
+        setting.addSearch((t) => {
+          const suggest = new FolderSuggest(this.app, t.inputEl, control.filter);
+          suggest.onSelect((folder) => {
+            suggest.setValue(folder.path);
+            suggest.close();
+            void save(folder.path);
+          });
+          t.setPlaceholder(control.placeholder ?? '').setValue(String(value ?? '')).onChange(save);
         });
-      });
-
-    new Setting(containerEl).setName('Code').setHeading();
-
-    new Setting(containerEl)
-      .setName('Code in the graph')
-      .setDesc('Show source code as derived nodes. Annotated adds symbols carrying @lat or @tg comments and what they point at; all adds every symbol. Files are only read, never changed.')
-      .addDropdown((d) =>
-        d
-          .addOptions({ off: 'Off', annotated: 'Annotated symbols', all: 'All symbols' })
-          .setValue(this.plugin.settings.codeMode)
-          .onChange(async (v) => this.plugin.setCodeMode(v === 'all' ? 'all' : v === 'annotated' ? 'annotated' : 'off')),
-      );
-
-    new Setting(containerEl)
-      .setName('Code folder')
-      .setDesc('Vault folder to scan for source files. Leave empty to scan the whole vault.')
-      .addText((t) =>
-        t.setPlaceholder('src').setValue(this.plugin.settings.codeRoot).onChange(async (v) => {
-          this.plugin.settings.codeRoot = v.trim();
-          await this.plugin.saveSettings();
-          await this.plugin.index.code.refresh();
-        }),
-      );
-
-    new Setting(containerEl).setName('Sidecar').setHeading();
-
-    new Setting(containerEl)
-      .setName('Sidecar URL')
-      .setDesc('Address and port of the sidecar, used by sidecar-backed queries.')
-      .addText((t) =>
-        t.setValue(this.plugin.settings.sidecarUrl).onChange(async (v) => {
-          this.plugin.settings.sidecarUrl = v.trim();
-          await this.plugin.saveSettings();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName('Sidecar token')
-      .setDesc("Bearer token configured on the sidecar. Stored in this vault's plugin data.")
-      .addText((t) => {
-        t.inputEl.type = 'password';
-        t.setValue(this.plugin.settings.sidecarToken).onChange(async (v) => {
-          this.plugin.settings.sidecarToken = v.trim();
-          await this.plugin.saveSettings();
-        });
-      });
-
-    new Setting(containerEl).setName('Indexing').setHeading();
-
-    new Setting(containerEl)
-      .setName('Indexed folders')
-      .setDesc(INDEX_FOLDERS_DESC)
-      .addTextArea((t) => {
-        t.inputEl.rows = 3;
-        t.setPlaceholder('Records').setValue(this.plugin.settings.indexFolders).onChange((v) => this.setControlValue('indexFolders', v));
-      });
-
-    new Setting(containerEl)
-      .setName('Excluded folders')
-      .setDesc(EXCLUDE_FOLDERS_DESC)
-      .addTextArea((t) => {
-        t.inputEl.rows = 3;
-        t.setPlaceholder('Scratch').setValue(this.plugin.settings.excludeFolders).onChange((v) => this.setControlValue('excludeFolders', v));
-      });
-
-    new Setting(containerEl)
-      .setName("Follow Obsidian's excluded files")
-      .setDesc(OBSIDIAN_EXCLUDED_DESC)
-      .addToggle((t) => t.setValue(this.plugin.settings.obsidianExcluded).onChange((v) => this.setControlValue('obsidianExcluded', v)));
-
-    new Setting(containerEl).setName('Types and styles').setHeading();
-
-    new Setting(containerEl)
-      .setName('Schema folder')
-      .setDesc('Each note directly in this folder declares the schema for the type named by its title.')
-      .addSearch((t) => {
-        const save = async (v: string) => {
-          this.plugin.settings.schemaFolder = v.trim() || DEFAULT_SCHEMA_FOLDER;
-          this.plugin.index.invalidate();
-          await this.plugin.saveSettings();
-        };
-        const suggest = new FolderSuggest(this.app, t.inputEl);
-        suggest.onSelect((folder) => {
-          suggest.setValue(folder.path);
-          suggest.close();
-          void save(folder.path);
-        });
-        t.setPlaceholder(DEFAULT_SCHEMA_FOLDER).setValue(this.plugin.settings.schemaFolder).onChange(save);
-      });
-
-    new Setting(containerEl)
-      .setName('Schema base IRI')
-      .setDesc('Names types, properties and edge types without a `uri` when exporting to or importing from SHACL.')
-      .addText((t) =>
-        t.setPlaceholder(DEFAULT_BASE_IRI).setValue(this.plugin.settings.schemaBaseIri).onChange(async (v) => {
-          this.plugin.settings.schemaBaseIri = v.trim() || DEFAULT_BASE_IRI;
-          await this.plugin.saveSettings();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName('Frontmatter links as edges')
-      .setDesc('Read wikilinks in note properties as edges typed by the property name, so `requirement: "[[Login]]"` is the edge `requirement:: [[Login]]`. Tags, aliases, cssclasses and type are skipped. Re-indexes the vault when changed.')
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.frontmatterEdges).onChange(async (v) => {
-          this.plugin.settings.frontmatterEdges = v;
-          await this.plugin.saveSettings();
-          await this.plugin.index.reindex();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName('AsciiDoc notes')
-      .setDesc('Index `.adoc` files as notes: properties from a leading `////` comment block and `:tg-*:` attributes, edges from `// @tg:` comments. The files are only read; this plugin does not open or edit them. Re-indexes the vault when changed.')
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.asciidoc).onChange(async (v) => {
-          this.plugin.settings.asciidoc = v;
-          await this.plugin.saveSettings();
-          await this.plugin.index.reindex();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName('Plain links as links_to edges')
-      .setDesc('Read ordinary wikilinks and markdown links in note text as untyped `links_to` edges, the way OKF consumers do. Typed edge lines such as `knows:: [[Bob]]` are unaffected. Re-indexes the vault when changed.')
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.linkEdges).onChange(async (v) => {
-          this.plugin.settings.linkEdges = v;
-          await this.plugin.saveSettings();
-          await this.plugin.index.reindex();
-        }),
-      );
-
-    new Setting(containerEl)
-      .setName('Show diagnostics')
-      .setDesc('Show the number of parse and schema issues in the status bar.')
-      .addToggle((t) =>
-        t.setValue(this.plugin.settings.showDiagnostics).onChange(async (v) => {
-          this.plugin.settings.showDiagnostics = v;
-          await this.plugin.saveSettings();
-        }),
-      );
-
-    const typeStyles = new Setting(containerEl)
-      .setName('Type styles')
-      .setDesc(TYPE_STYLES_DESC);
-    this.jsonEditor(typeStyles, 'typeStyles', 8);
-
-    const edgeStyles = new Setting(containerEl)
-      .setName('Edge styles')
-      .setDesc(EDGE_STYLES_DESC);
-    this.jsonEditor(edgeStyles, 'edgeStyles', 6);
+        break;
+      default:
+        // No control of another type is declared in getSettingDefinitions().
+        break;
+    }
   }
 
   /**
@@ -389,7 +248,7 @@ export class ObsigraphSettingTab extends PluginSettingTab {
         type: 'group',
         heading: 'Types and styles',
         items: [
-          { name: 'Schema folder', desc: 'Each note directly in this folder declares the schema for the type named by its title.', control: { type: 'folder', key: 'schemaFolder' } },
+          { name: 'Schema folder', desc: 'Each note directly in this folder declares the schema for the type named by its title.', control: { type: 'folder', key: 'schemaFolder', placeholder: DEFAULT_SCHEMA_FOLDER } },
           { name: 'Schema base IRI', desc: 'Names types, properties and edge types without a `uri` when exporting to or importing from SHACL.', control: { type: 'text', key: 'schemaBaseIri', placeholder: DEFAULT_BASE_IRI } },
           {
             name: 'Frontmatter links as edges',
@@ -409,13 +268,13 @@ export class ObsigraphSettingTab extends PluginSettingTab {
           { name: 'Show diagnostics', desc: 'Show the number of parse and schema issues in the status bar.', control: { type: 'toggle', key: 'showDiagnostics' } },
           {
             name: 'Type styles',
-            desc: TYPE_STYLES_DESC,
+            desc: 'JSON keyed by type label: color, shape, icon (Lucide name) and label (property shown instead of the title). Example: {"Person": {"color": "#59a14f", "shape": "round-rectangle", "icon": "user"}}.',
             aliases: ['colors', 'shapes', 'icons'],
             render: (setting) => this.jsonEditor(setting, 'typeStyles', 8),
           },
           {
             name: 'Edge styles',
-            desc: EDGE_STYLES_DESC,
+            desc: 'JSON keyed by edge type: color and line (solid, dashed, dotted). Negative edges are dashed red unless set here. Example: {"knows": {"color": "orange"}}.',
             render: (setting) => this.jsonEditor(setting, 'edgeStyles', 6),
           },
         ],
@@ -429,16 +288,16 @@ export class ObsigraphSettingTab extends PluginSettingTab {
 
   /** Persist through the plugin so caches refresh and open views restyle. */
   async setControlValue(key: string, value: unknown): Promise<void> {
-    // Same effects as the legacy display() controls.
+    // Side effects of a change, for both the declarative and the legacy tab.
     if (key === 'codeMode') {
       await this.plugin.setCodeMode(value === 'all' ? 'all' : value === 'annotated' ? 'annotated' : 'off');
       return;
     }
     const settings = this.plugin.settings as unknown as Record<string, unknown>;
     const text = typeof value === 'string' ? value.trim() : '';
-    if (key === 'schemaFolder') settings[key] = text ? value : DEFAULT_SCHEMA_FOLDER;
+    if (key === 'schemaFolder') settings[key] = text || DEFAULT_SCHEMA_FOLDER;
     else if (key === 'schemaBaseIri') settings[key] = text || DEFAULT_BASE_IRI;
-    else if (key === 'codeRoot') settings[key] = text;
+    else if (key === 'codeRoot' || key === 'sidecarUrl') settings[key] = text;
     else settings[key] = value;
     if (key === 'schemaFolder') this.plugin.index.invalidate();
     await this.plugin.saveSettings();
