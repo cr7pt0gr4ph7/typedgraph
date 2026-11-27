@@ -52,6 +52,12 @@ The option is off by default so existing vaults keep their graphs and queries; i
 
 In the Obsidian plugin both options are settings, "Plain links as links_to edges" and "Frontmatter links as edges", off by default; changing either re-indexes the vault. See [[tests/edge-settings]].
 
+## Plugin settings tabs
+
+The Obsidian plugin defines its settings twice: declaratively in [[packages/plugin/src/settings.ts#ObsigraphSettingTab#getSettingDefinitions]] for Obsidian 1.13+, and in the legacy [[packages/plugin/src/settings.ts#ObsigraphSettingTab#display]] for older versions.
+
+Both show the same headings, names, descriptions, order and control types. Older Obsidian has no number or folder control, so the legacy tab uses a number-only text box and a search box that suggests vault folders. A unit test renders both and compares them ([[tests/edge-settings#Legacy tab matches the declarative settings]]).
+
 ## Indexed folders
 
 The Obsidian plugin indexes the whole vault unless its settings narrow it: "Indexed folders" (one per line, empty means all), "Excluded folders", and "Follow Obsidian's excluded files", off by default.

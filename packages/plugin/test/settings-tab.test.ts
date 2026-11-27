@@ -1,6 +1,72 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('obsidian', () => ({ App: class App {}, PluginSettingTab: class PluginSettingTab {}, Setting: class Setting {} }));
+/** What a rendered setting shows: a heading, or a name, description and the controls it holds. */
+type Rendered = { heading: string } | { name: string; desc: string; controls: string[] };
+
+const rendered = vi.hoisted(() => [] as { heading: boolean; name: string; desc: string; controls: string[] }[]);
+
+vi.mock('obsidian', () => {
+  const component = () => {
+    const c = {
+      inputEl: { type: 'text', rows: 0, min: '', max: '', addClass() {} },
+      setValue: () => c,
+      setPlaceholder: () => c,
+      onChange: () => c,
+      addOptions: () => c,
+    };
+    return c;
+  };
+  class Setting {
+    heading = false;
+    name = '';
+    desc = '';
+    controls: string[] = [];
+    descEl = { createDiv: () => ({ setText() {} }) };
+    constructor() {
+      rendered.push(this);
+    }
+    setName(n: string) {
+      this.name = n;
+      return this;
+    }
+    setDesc(d: string) {
+      this.desc = d;
+      return this;
+    }
+    setHeading() {
+      this.heading = true;
+      return this;
+    }
+    private add(kind: string, cb: (c: ReturnType<typeof component>) => unknown) {
+      const c = component();
+      cb(c);
+      // A text box typed as number or password is the legacy stand-in for those controls.
+      this.controls.push(kind === 'text' && c.inputEl.type !== 'text' ? c.inputEl.type : kind);
+      return this;
+    }
+    addText(cb: (c: unknown) => unknown) {
+      return this.add('text', cb);
+    }
+    addTextArea(cb: (c: unknown) => unknown) {
+      return this.add('textarea', cb);
+    }
+    addToggle(cb: (c: unknown) => unknown) {
+      return this.add('toggle', cb);
+    }
+    addDropdown(cb: (c: unknown) => unknown) {
+      return this.add('dropdown', cb);
+    }
+    addSearch(cb: (c: unknown) => unknown) {
+      return this.add('folder', cb);
+    }
+  }
+  class AbstractInputSuggest {
+    onSelect() {
+      return this;
+    }
+  }
+  return { App: class App {}, PluginSettingTab: class PluginSettingTab {}, Setting, AbstractInputSuggest };
+});
 
 const { ObsigraphSettingTab, DEFAULT_SETTINGS } = await import('../src/settings');
 
@@ -74,5 +140,38 @@ describe('settings tab', () => {
     expect(plugin.settings.schemaBaseIri).toBe(DEFAULT_SETTINGS.schemaBaseIri);
     await t.setControlValue('schemaBaseIri', ' urn:x: ');
     expect(plugin.settings.schemaBaseIri).toBe('urn:x:');
+  });
+
+  // @tg: verifies:: [[openspec:graph-model#Legacy settings match the declarative settings#Names and order]] {since: "2026-11-27", level: unit}
+  // @tg: verifies:: [[openspec:graph-model#Legacy settings match the declarative settings#Descriptions]] {since: "2026-11-27", level: unit}
+  // @tg: verifies:: [[openspec:graph-model#Legacy settings match the declarative settings#Control types]] {since: "2026-11-27", level: unit}
+  // @lat: [[tests/edge-settings#Legacy tab matches the declarative settings]]
+  it('renders the legacy tab with the headings, names, descriptions, order and controls of the declarative settings', async () => {
+    const { t } = tab();
+    const { Setting } = await import('obsidian');
+    const modern: Rendered[] = [];
+    for (const group of t.getSettingDefinitions()) {
+      if (!('items' in group)) continue;
+      if ('heading' in group && group.heading) modern.push({ heading: group.heading });
+      for (const item of group.items ?? []) {
+        if (!('name' in item) || item.name === undefined) continue;
+        let controls: string[] = [];
+        if ('control' in item && item.control) controls = [item.control.type];
+        else if ('render' in item && item.render) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const probe = new (Setting as any)();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          item.render(probe, {} as any);
+          controls = probe.controls;
+        }
+        modern.push({ name: item.name, desc: String(item.desc), controls });
+      }
+    }
+    rendered.length = 0;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (t as any).containerEl = { empty() {}, createDiv: () => ({ setText() {} }) };
+    t.display();
+    const legacy: Rendered[] = rendered.map((s) => (s.heading ? { heading: s.name } : { name: s.name, desc: s.desc, controls: s.controls }));
+    expect(legacy).toEqual(modern);
   });
 });

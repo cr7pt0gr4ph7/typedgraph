@@ -2,6 +2,12 @@
 
 All notable changes to the Typed Graph plugin, the `tg` CLI, the core library and the sidecar. The VS Code extension keeps its own [changelog](packages/vscode/CHANGELOG.md).
 
+## Unreleased
+
+### Changed
+
+- **One settings layout for every Obsidian version.** The settings tab used before Obsidian 1.13 now has the same headings, settings, order, descriptions and control types as the 1.13+ settings. Numbers are entered in number boxes, and the schema folder suggests vault folders. The style settings show their JSON examples in both. A test keeps the two in step.
+
 ## 0.31.0 — 2026-11-24
 
 OpenFlow joins the spec frameworks `tg` traces.

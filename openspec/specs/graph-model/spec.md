@@ -154,3 +154,18 @@ The Obsidian plugin SHALL offer the plain-link edge option and the frontmatter-l
 #### Scenario: Defaults
 - **WHEN** neither setting has been changed
 - **THEN** the graph has no `links_to` and no frontmatter edges
+
+### Requirement: Legacy settings match the declarative settings
+The Obsidian plugin SHALL show the same settings in its legacy settings tab (`display()`, used before Obsidian 1.13) as in its declarative settings (`getSettingDefinitions()`): the same group headings and setting names in the same order, the same descriptions, and the same type of control for each setting.
+
+#### Scenario: Names and order
+- **WHEN** the legacy tab is rendered
+- **THEN** its headings and setting names appear in the order the declarative groups and items list them
+
+#### Scenario: Descriptions
+- **WHEN** the legacy tab is rendered
+- **THEN** every setting has the description its declarative definition gives
+
+#### Scenario: Control types
+- **WHEN** the legacy tab is rendered
+- **THEN** every setting has the control type of its declarative definition: a toggle, dropdown, text box or text area as declared, a number-only text box for a `number` control, a folder-suggesting search box for a `folder` control, and for a custom-rendered setting the controls its `render` adds

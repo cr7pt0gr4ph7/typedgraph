@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting, type SettingDefinitionItem } from 'obsidian';
+import { AbstractInputSuggest, App, PluginSettingTab, Setting, type SettingDefinitionItem, type TextComponent, type TFolder } from 'obsidian';
 import type ObsigraphPlugin from './main';
 import { DEFAULT_BASE_IRI, DEFAULT_MAX_PATH_DEPTH, DEFAULT_SCHEMA_FOLDER, type CodeMode, type EdgeStyle, type NodeStyle } from '@obsigraph/core';
 import { parseEdgeStyles, parseTypeStyles } from './render/styles';
@@ -71,6 +71,34 @@ export const DEFAULT_SETTINGS: ObsigraphSettings = {
 const INDEX_FOLDERS_DESC = 'Only notes in these folders are indexed, one folder per line. Leave empty to index the whole vault. The schema folder is always indexed.';
 const EXCLUDE_FOLDERS_DESC = 'Notes in these folders are not indexed, one folder per line. Links into them end at stub nodes, as links to missing notes do. Re-indexes the vault when changed.';
 const OBSIDIAN_EXCLUDED_DESC = "Also leave out the files hidden by Obsidian's Files and links › Excluded files option. Re-indexes the vault when changed.";
+const TYPE_STYLES_DESC = 'JSON keyed by type label: color, shape, icon (Lucide name) and label (property shown instead of the title). Example: {"Person": {"color": "#59a14f", "shape": "round-rectangle", "icon": "user"}}.';
+const EDGE_STYLES_DESC = 'JSON keyed by edge type: color and line (solid, dashed, dotted). Negative edges are dashed red unless set here. Example: {"knows": {"color": "orange"}}.';
+
+/** The legacy stand-in for a declarative `number` control: a text box that takes numbers. */
+function numberInput(t: TextComponent, min: number, max: number): void {
+  t.inputEl.type = 'number';
+  t.inputEl.min = String(min);
+  t.inputEl.max = String(max);
+}
+
+/** The legacy stand-in for a declarative `folder` control: suggests vault folders as you type. */
+class FolderSuggest extends AbstractInputSuggest<TFolder> {
+  constructor(
+    private readonly vaultApp: App,
+    inputEl: HTMLInputElement,
+  ) {
+    super(vaultApp, inputEl);
+  }
+
+  protected getSuggestions(query: string): TFolder[] {
+    const q = query.toLowerCase();
+    return this.vaultApp.vault.getAllFolders().filter((f) => f.path.toLowerCase().includes(q));
+  }
+
+  renderSuggestion(folder: TFolder, el: HTMLElement): void {
+    el.setText(folder.path);
+  }
+}
 
 // @tg: implements:: [[openspec:graph-model#Edge options as plugin settings]] {since: "2026-10-13"}
 export class ObsigraphSettingTab extends PluginSettingTab {
@@ -81,22 +109,13 @@ export class ObsigraphSettingTab extends PluginSettingTab {
     super(app, plugin);
   }
 
+  /** Settings for Obsidian before 1.13; mirrors getSettingDefinitions() heading for heading and setting for setting. */
+  // @tg: implements:: [[openspec:graph-model#Legacy settings match the declarative settings]] {since: "2026-11-27"}
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
 
-    new Setting(containerEl)
-      .setName('Maximum graph elements')
-      .setDesc('Graph results with more nodes plus edges than this are shown as a table instead.')
-      .addText((t) =>
-        t.setValue(String(this.plugin.settings.maxElements)).onChange(async (v) => {
-          const n = Number(v);
-          if (Number.isInteger(n) && n > 0) {
-            this.plugin.settings.maxElements = n;
-            await this.plugin.saveSettings();
-          }
-        }),
-      );
+    new Setting(containerEl).setName('Queries').setHeading();
 
     new Setting(containerEl)
       .setName('Default query backend')
@@ -110,6 +129,50 @@ export class ObsigraphSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           }),
       );
+
+    new Setting(containerEl)
+      .setName('Maximum graph elements')
+      .setDesc('Graph results with more nodes plus edges than this are shown as a table instead.')
+      .addText((t) => {
+        numberInput(t, 1, 100000);
+        t.setValue(String(this.plugin.settings.maxElements)).onChange(async (v) => {
+          const n = Number(v);
+          if (Number.isInteger(n) && n > 0) {
+            this.plugin.settings.maxElements = n;
+            await this.plugin.saveSettings();
+          }
+        });
+      });
+
+    new Setting(containerEl)
+      .setName('Maximum path depth')
+      .setDesc('Unbounded variable-length patterns stop at this many hops.')
+      .addText((t) => {
+        numberInput(t, 1, 50);
+        t.setValue(String(this.plugin.settings.maxPathDepth)).onChange(async (v) => {
+          const n = Number(v);
+          if (Number.isInteger(n) && n > 0 && n <= 50) {
+            this.plugin.settings.maxPathDepth = n;
+            await this.plugin.saveSettings();
+          }
+        });
+      });
+
+    new Setting(containerEl)
+      .setName('Refresh delay (ms)')
+      .setDesc('How long query blocks wait after a vault change before re-running.')
+      .addText((t) => {
+        numberInput(t, 0, 60000);
+        t.setValue(String(this.plugin.settings.refreshDebounceMs)).onChange(async (v) => {
+          const n = Number(v);
+          if (Number.isInteger(n) && n >= 0) {
+            this.plugin.settings.refreshDebounceMs = n;
+            await this.plugin.saveSettings();
+          }
+        });
+      });
+
+    new Setting(containerEl).setName('Code').setHeading();
 
     new Setting(containerEl)
       .setName('Code in the graph')
@@ -132,6 +195,8 @@ export class ObsigraphSettingTab extends PluginSettingTab {
         }),
       );
 
+    new Setting(containerEl).setName('Sidecar').setHeading();
+
     new Setting(containerEl)
       .setName('Sidecar URL')
       .setDesc('Address and port of the sidecar, used by sidecar-backed queries.')
@@ -144,7 +209,7 @@ export class ObsigraphSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName('Sidecar token')
-      .setDesc('Bearer token configured on the sidecar. Stored in this vault\'s plugin data.')
+      .setDesc("Bearer token configured on the sidecar. Stored in this vault's plugin data.")
       .addText((t) => {
         t.inputEl.type = 'password';
         t.setValue(this.plugin.settings.sidecarToken).onChange(async (v) => {
@@ -153,42 +218,48 @@ export class ObsigraphSettingTab extends PluginSettingTab {
         });
       });
 
-    new Setting(containerEl)
-      .setName('Maximum path depth')
-      .setDesc('Unbounded variable-length patterns such as [:knows*] stop at this many hops.')
-      .addText((t) =>
-        t.setValue(String(this.plugin.settings.maxPathDepth)).onChange(async (v) => {
-          const n = Number(v);
-          if (Number.isInteger(n) && n > 0 && n <= 50) {
-            this.plugin.settings.maxPathDepth = n;
-            await this.plugin.saveSettings();
-          }
-        }),
-      );
+    new Setting(containerEl).setName('Indexing').setHeading();
 
     new Setting(containerEl)
-      .setName('Refresh delay (ms)')
-      .setDesc('How long query blocks wait after a vault change before re-running.')
-      .addText((t) =>
-        t.setValue(String(this.plugin.settings.refreshDebounceMs)).onChange(async (v) => {
-          const n = Number(v);
-          if (Number.isInteger(n) && n >= 0) {
-            this.plugin.settings.refreshDebounceMs = n;
-            await this.plugin.saveSettings();
-          }
-        }),
-      );
+      .setName('Indexed folders')
+      .setDesc(INDEX_FOLDERS_DESC)
+      .addTextArea((t) => {
+        t.inputEl.rows = 3;
+        t.setPlaceholder('Records').setValue(this.plugin.settings.indexFolders).onChange((v) => this.setControlValue('indexFolders', v));
+      });
+
+    new Setting(containerEl)
+      .setName('Excluded folders')
+      .setDesc(EXCLUDE_FOLDERS_DESC)
+      .addTextArea((t) => {
+        t.inputEl.rows = 3;
+        t.setPlaceholder('Scratch').setValue(this.plugin.settings.excludeFolders).onChange((v) => this.setControlValue('excludeFolders', v));
+      });
+
+    new Setting(containerEl)
+      .setName("Follow Obsidian's excluded files")
+      .setDesc(OBSIDIAN_EXCLUDED_DESC)
+      .addToggle((t) => t.setValue(this.plugin.settings.obsidianExcluded).onChange((v) => this.setControlValue('obsidianExcluded', v)));
+
+    new Setting(containerEl).setName('Types and styles').setHeading();
 
     new Setting(containerEl)
       .setName('Schema folder')
-      .setDesc('Each note directly in this folder declares types: the one named by its title under `schema:`, others under `schemas:`, and edge types under `edgeTypes:`.')
-      .addText((t) =>
-        t.setPlaceholder(DEFAULT_SCHEMA_FOLDER).setValue(this.plugin.settings.schemaFolder).onChange(async (v) => {
+      .setDesc('Each note directly in this folder declares the schema for the type named by its title.')
+      .addSearch((t) => {
+        const save = async (v: string) => {
           this.plugin.settings.schemaFolder = v.trim() || DEFAULT_SCHEMA_FOLDER;
           this.plugin.index.invalidate();
           await this.plugin.saveSettings();
-        }),
-      );
+        };
+        const suggest = new FolderSuggest(this.app, t.inputEl);
+        suggest.onSelect((folder) => {
+          suggest.setValue(folder.path);
+          suggest.close();
+          void save(folder.path);
+        });
+        t.setPlaceholder(DEFAULT_SCHEMA_FOLDER).setValue(this.plugin.settings.schemaFolder).onChange(save);
+      });
 
     new Setting(containerEl)
       .setName('Schema base IRI')
@@ -234,27 +305,6 @@ export class ObsigraphSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName('Indexed folders')
-      .setDesc(INDEX_FOLDERS_DESC)
-      .addTextArea((t) => {
-        t.inputEl.rows = 3;
-        t.setPlaceholder('Records').setValue(this.plugin.settings.indexFolders).onChange((v) => this.setControlValue('indexFolders', v));
-      });
-
-    new Setting(containerEl)
-      .setName('Excluded folders')
-      .setDesc(EXCLUDE_FOLDERS_DESC)
-      .addTextArea((t) => {
-        t.inputEl.rows = 3;
-        t.setPlaceholder('Scratch').setValue(this.plugin.settings.excludeFolders).onChange((v) => this.setControlValue('excludeFolders', v));
-      });
-
-    new Setting(containerEl)
-      .setName("Follow Obsidian's excluded files")
-      .setDesc(OBSIDIAN_EXCLUDED_DESC)
-      .addToggle((t) => t.setValue(this.plugin.settings.obsidianExcluded).onChange((v) => this.setControlValue('obsidianExcluded', v)));
-
-    new Setting(containerEl)
       .setName('Show diagnostics')
       .setDesc('Show the number of parse and schema issues in the status bar.')
       .addToggle((t) =>
@@ -266,12 +316,12 @@ export class ObsigraphSettingTab extends PluginSettingTab {
 
     const typeStyles = new Setting(containerEl)
       .setName('Type styles')
-      .setDesc('JSON keyed by type label: color, shape, icon (Lucide name) and label (property shown instead of the title). Schema notes and block headers override these per attribute. Example: {"Person": {"color": "#59a14f", "shape": "round-rectangle", "icon": "user"}}.');
+      .setDesc(TYPE_STYLES_DESC);
     this.jsonEditor(typeStyles, 'typeStyles', 8);
 
     const edgeStyles = new Setting(containerEl)
       .setName('Edge styles')
-      .setDesc('JSON keyed by edge type: color and line (solid, dashed, dotted). Negative edges are dashed red unless set here. Example: {"knows": {"color": "orange"}}.');
+      .setDesc(EDGE_STYLES_DESC);
     this.jsonEditor(edgeStyles, 'edgeStyles', 6);
   }
 
@@ -359,13 +409,13 @@ export class ObsigraphSettingTab extends PluginSettingTab {
           { name: 'Show diagnostics', desc: 'Show the number of parse and schema issues in the status bar.', control: { type: 'toggle', key: 'showDiagnostics' } },
           {
             name: 'Type styles',
-            desc: 'JSON keyed by type label: color, shape, icon (Lucide name) and label (property shown instead of the title).',
+            desc: TYPE_STYLES_DESC,
             aliases: ['colors', 'shapes', 'icons'],
             render: (setting) => this.jsonEditor(setting, 'typeStyles', 8),
           },
           {
             name: 'Edge styles',
-            desc: 'JSON keyed by edge type: color and line (solid, dashed, dotted). Negative edges are dashed red unless set here.',
+            desc: EDGE_STYLES_DESC,
             render: (setting) => this.jsonEditor(setting, 'edgeStyles', 6),
           },
         ],
