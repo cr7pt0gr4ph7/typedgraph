@@ -2,6 +2,16 @@
 
 All notable changes to the Typed Graph plugin, the `tg` CLI, the core library and the sidecar. The VS Code extension keeps its own [changelog](packages/vscode/CHANGELOG.md).
 
+## Unreleased
+
+One schema folder for every command, stated once in the CLI's config.
+
+### Added
+
+- **`--schema-folder` on every command that touches the ontology.** `tg cypher`, `tg migrate`, `tg init` and `tg upgrade` join `tg ontology`, `tg validate` and `tg schema`. A value outside the project (absolute, `..`, the root) exits 2.
+- **`schemaFolder` in `.tg/config.json`.** Without the flag, those commands read the folder from the committed config, then fall back to `Types/`. A broken value is reported and keeps the `notes` globs.
+- **Init and upgrade use the folder.** `tg init --schema-folder Ontology` writes `code-types.md`, `core-types.md` and `spec-types.md` to `Ontology/`. The instructions, skills, Cursor rules, ontology guide and spec ontology name the folder, and it is recorded in `.tg/config.json`. `tg upgrade` refreshes the ontology where the config says it lives. Without the flag, nothing changes for existing projects.
+
 ## 0.31.0 — 2026-11-24
 
 OpenFlow joins the spec frameworks `tg` traces.

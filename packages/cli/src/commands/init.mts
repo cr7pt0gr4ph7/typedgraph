@@ -1,11 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
-import { CONFIG_FILE, readConfig, TG_GITIGNORE } from '../config.mjs';
+import { CONFIG_FILE, configFolder, readConfig, resolveSchemaFolder, TG_GITIGNORE, withConfig } from '../config.mjs';
 import { walkProject } from '../walk.mjs';
 import { EXIT_ERROR, EXIT_OK, register, type Command, type Ctx } from '../cli.mjs';
 import { unifiedDiff } from '../diff.mjs';
 import { DOCS_DIRS, existingDocsDir, type DocsDir } from '../root.mjs';
-import type { SpecFrameworkId } from '@obsigraph/core';
+import { DEFAULT_SCHEMA_FOLDER, type SpecFrameworkId } from '@obsigraph/core';
 import { AGENT_IDS, AGENTS, detectAgents, parseAgents, type Agent } from './agents.mjs';
 import { CORE_ONTOLOGY_FILE, moveToCore } from '../core-ontology.mjs';
 import { ONTOLOGY_TEMPLATES, OPENSPEC_PATCHES, SKILLS, SPEC_TEMPLATES, STAGE_PATCHES, TEMPLATES } from './gen.mjs';
@@ -24,13 +24,25 @@ export interface Change {
   after: string;
 }
 
-const block = (docs: DocsDir, specs: readonly SpecFrameworkId[]): string => `${BEGIN}\n${forDocs(forSpecs(TEMPLATES.agents, specs), docs).trimEnd()}\n${END}\n`;
+const block = (docs: DocsDir, specs: readonly SpecFrameworkId[], folder: string): string => `${BEGIN}\n${forSchema(forDocs(forSpecs(TEMPLATES.agents, specs), docs), folder).trimEnd()}\n${END}\n`;
 
 /** Template text for a project whose docs folder is `docs`: the bundled text names `lat.md/`. */
 // @tg: implements:: [[openspec:tg-agent-integration#Docs folder choice]]
 export function forDocs(text: string, docs: DocsDir): string {
   return docs === 'lat.md' ? text : text.replaceAll('lat.md/lat.md', `${docs}/${docs}`).replaceAll('lat.md/', `${docs}/`);
 }
+
+/**
+ * Template text for a project whose schema folder is `folder` (with a trailing slash): the bundled text names
+ * `Types/`, as a folder of its own, not as the end of a longer name.
+ */
+// @tg: implements:: [[openspec:tg-agent-integration#Schema folder choice]]
+export function forSchema(text: string, folder: string): string {
+  return folder === DEFAULT_SCHEMA_FOLDER ? text : text.replace(/(?<![\w./-])Types\//g, folder);
+}
+
+/** A tg ontology file such as `Types/core-types.md`, moved into the schema folder `folder`. */
+export const inSchemaFolder = (file: string, folder: string): string => `${folder}${basename(file)}`;
 
 function between(text: string, begin: string, end: string): { start: number; stop: number } | null {
   const s = text.indexOf(begin);
@@ -40,11 +52,11 @@ function between(text: string, begin: string, end: string): { start: number; sto
 
 /** Put the managed block into an instruction file, replacing a previous tg block and, with `migrate`, a lat block. */
 // @tg: implements:: [[openspec:tg-agent-integration#Migration from lat]]
-export function withBlock(existing: string | null, migrate: boolean, docs: DocsDir = 'lat.md', specs: readonly SpecFrameworkId[] = []): { text: string; hadLat: boolean } {
+export function withBlock(existing: string | null, migrate: boolean, docs: DocsDir = 'lat.md', specs: readonly SpecFrameworkId[] = [], folder: string = DEFAULT_SCHEMA_FOLDER): { text: string; hadLat: boolean } {
   const text = existing ?? '';
   const mine = between(text, BEGIN, END);
   const lat = between(text, LAT_BEGIN, LAT_END);
-  const managed = block(docs, specs).trimEnd();
+  const managed = block(docs, specs, folder).trimEnd();
   if (mine) {
     const updated = `${text.slice(0, mine.start)}${managed}${text.slice(mine.stop)}`;
     // A file that already has a tg block (from an earlier init without --migrate) can still hold the lat block: drop it.
@@ -101,7 +113,7 @@ const OPENSPEC_FILES: [keyof typeof OPENSPEC_PATCHES, string, string][] = [
 ];
 
 const OPENSPEC_CONFIG = 'openspec/config.yaml';
-const ONTOLOGY_SCHEMA = 'Types/code-types.md';
+export const ONTOLOGY_SCHEMA = 'Types/code-types.md';
 const LEGACY_ONTOLOGY_SCHEMA = 'ontology/code-types.md';
 
 /** Append or replace the tg block at the end of an OpenSpec skill or command; text outside the block is kept as is. */
@@ -135,6 +147,11 @@ export interface InitOptions {
   docs?: DocsDir;
   /** Spec frameworks to wire up (default: the ones the project already uses). */
   specs?: readonly SpecFrameworkId[];
+  /**
+   * Schema folder from `--schema-folder`, already checked (with a trailing slash). It is written to
+   * `.tg/config.json` when it differs from what the project uses; without it, the config's folder or `Types/`.
+   */
+  schemaFolder?: string;
 }
 
 const INDEX = `# Project
@@ -172,7 +189,8 @@ export function planInit(root: string, agents: readonly Agent[], migrate: boolea
   const parts = new Set<Part>(options.parts ?? PART_IDS);
   const docs = existingDocsDir(root) ?? options.docs ?? 'lat.md';
   const specs = options.specs ?? detectSpecs(root);
-  const text = (t: string) => forDocs(forSpecs(t, specs), docs);
+  const schemaFolder = options.schemaFolder ?? resolveSchemaFolder(root, undefined).folder;
+  const text = (t: string) => forSchema(forDocs(forSpecs(t, specs), docs), schemaFolder);
   const changes: Change[] = [];
   const notes: string[] = [];
   const add = (rel: string, after: string) => {
@@ -186,17 +204,17 @@ export function planInit(root: string, agents: readonly Agent[], migrate: boolea
   if ((parts.has('instructions') || parts.has('ontology')) && !existsSync(join(root, docs))) {
     add(`${docs}/${docs}`, parts.has('ontology') ? `${INDEX}${INDEX_ONTOLOGY}` : INDEX);
   }
-  if (parts.has('ontology')) planOntology(root, docs, add, notes);
+  if (parts.has('ontology')) planOntology(root, docs, schemaFolder, add, notes);
   // Tool-owned: rewritten for the frameworks in use, so adding one later brings its types.
   const specTypes = parts.has('ontology') ? specOntology(specs) : null;
-  if (specTypes) add(SPEC_ONTOLOGY_FILE, specTypes);
+  if (specTypes) add(inSchemaFolder(SPEC_ONTOLOGY_FILE, schemaFolder), forSchema(specTypes, schemaFolder));
   if (parts.has('instructions')) {
     for (const doc of new Set(agents.map((a) => a.instructions))) {
       if (doc === '.cursor/rules/tg.mdc') {
         add(doc, text(TEMPLATES.cursor));
         continue;
       }
-      const r = withBlock(read(join(root, doc)), migrate, docs, specs);
+      const r = withBlock(read(join(root, doc)), migrate, docs, specs, schemaFolder);
       if (r.hadLat && !migrate && !(read(join(root, doc)) ?? '').includes(BEGIN)) notes.push(`${doc} has a lat.md block; it is left in place. Re-run with --migrate to replace it with the tg block.`);
       add(doc, r.text);
     }
@@ -226,7 +244,7 @@ export function planInit(root: string, agents: readonly Agent[], migrate: boolea
     planSpecPatches(root, agents, add);
     planSpecScaffolds(root, specs, add);
   }
-  planNotes(root, add, notes);
+  planConfig(root, options.schemaFolder, add, notes);
   return { changes, notes };
 }
 
@@ -276,18 +294,46 @@ function planSpecScaffolds(root: string, specs: readonly SpecFrameworkId[], add:
  * Projects without `.adoc` files are left exactly as they were.
  */
 // @tg: implements:: [[openspec:asciidoc-notes#Hosts index AsciiDoc notes]] {confidence: partial}
-function planNotes(root: string, add: (rel: string, after: string) => void, notes: string[]): void {
+function planNotes(root: string, patch: Record<string, unknown>, notes: string[]): boolean {
   const adoc = walkProject(root).filter((e) => e.toLowerCase().endsWith('.adoc') && !DOCS_DIRS.some((d) => e.startsWith(`${d}/`)));
-  if (!adoc.length) return;
+  if (!adoc.length) return false;
   const { config, error } = readConfig(root);
   if (error) {
     notes.push(`${error}; its notes globs were not changed.`);
   } else if (!config.notes.length && !existsSync(join(root, CONFIG_FILE))) {
     const folders = [...new Set(adoc.map((e) => (e.includes('/') ? e.slice(0, e.indexOf('/')) : '')))].sort();
     const globs = folders.map((f) => (f ? `${f}/**/*.adoc` : '*.adoc'));
-    add(CONFIG_FILE, `${JSON.stringify({ notes: globs }, null, 2)}\n`);
+    patch.notes = globs;
     notes.push(`${adoc.length} .adoc file${adoc.length === 1 ? '' : 's'} found; ${CONFIG_FILE} proposes ${globs.join(', ')} as notes. Edit the globs to taste.`);
   }
+  return true;
+}
+
+/**
+ * A schema folder given with `--schema-folder` is recorded as `schemaFolder` in `.tg/config.json` when it
+ * differs from the folder the project uses, so every later command and the Obsidian plugin read the same one.
+ */
+// @tg: implements:: [[openspec:tg-agent-integration#Schema folder choice]]
+function planSchemaFolder(root: string, folder: string | undefined, patch: Record<string, unknown>): void {
+  if (folder === undefined) return;
+  const { config } = readConfig(root);
+  const current = config.schemaFolder === undefined ? undefined : configFolder(config.schemaFolder);
+  const wanted = configFolder(folder);
+  if (current === wanted || (current === undefined && folder === DEFAULT_SCHEMA_FOLDER)) return;
+  patch.schemaFolder = wanted;
+}
+
+/** `.tg/config.json` with the AsciiDoc note globs and the schema folder, written once, and the `.tg/.gitignore` beside it. */
+function planConfig(root: string, schemaFolder: string | undefined, add: (rel: string, after: string) => void, notes: string[]): void {
+  const patch: Record<string, unknown> = {};
+  const adoc = planNotes(root, patch, notes);
+  planSchemaFolder(root, schemaFolder, patch);
+  if (Object.keys(patch).length) {
+    const next = withConfig(read(join(root, CONFIG_FILE)), patch);
+    if (next === null) notes.push(`${CONFIG_FILE} is not a JSON object; it was not changed.`);
+    else add(CONFIG_FILE, next);
+  }
+  if (!adoc && !Object.keys(patch).length) return;
   const ignore = read(join(root, '.tg/.gitignore'));
   // An earlier `*` would hide the committed config, so it is replaced by the list of derived files.
   if (ignore === null || ignore.split('\n').some((l) => l.trim() === '*')) add('.tg/.gitignore', TG_GITIGNORE);
@@ -299,23 +345,25 @@ function planNotes(root: string, add: (rel: string, after: string) => void, note
  * project-owned once written, so a re-run never overwrites local edits.
  */
 // @tg: implements:: [[openspec:tg-agent-integration#Code ontology install]]
-function planOntology(root: string, docs: DocsDir, add: (rel: string, after: string) => void, notes: string[]): void {
+function planOntology(root: string, docs: DocsDir, folder: string, add: (rel: string, after: string) => void, notes: string[]): void {
+  const schema = inSchemaFolder(ONTOLOGY_SCHEMA, folder);
+  const core = inSchemaFolder(CORE_ONTOLOGY_FILE, folder);
   const files: [string, string][] = [
-    [`${docs}/code-ontology.md`, forDocs(TEMPLATES.ontologyGuide, docs)],
-    [ONTOLOGY_SCHEMA, forDocs(TEMPLATES.ontologySchema, docs)],
+    [`${docs}/code-ontology.md`, forSchema(forDocs(TEMPLATES.ontologyGuide, docs), folder)],
+    [schema, forSchema(forDocs(TEMPLATES.ontologySchema, docs), folder)],
     ...Object.entries(ONTOLOGY_TEMPLATES).map(([type, text]): [string, string] => [`Templates/${type}.md`, text]),
   ];
   for (const [rel, text] of files) if (!existsSync(join(root, rel))) add(rel, text);
   // The shared core is tool-owned and always current. A code ontology from before 0.30 declares `contradicts`
   // itself; it moves to the core unless the project changed it, so no name is declared twice.
-  const mine = read(join(root, ONTOLOGY_SCHEMA));
+  const mine = read(join(root, schema));
   const moved = mine === null ? null : moveToCore(mine);
-  if (moved?.text) add(ONTOLOGY_SCHEMA, moved.text);
+  if (moved?.text) add(schema, moved.text);
   if (moved?.kept.length) {
-    notes.push(`${ONTOLOGY_SCHEMA} declares its own ${moved.kept.map((k) => `'${k}'`).join(', ')} with changes of yours, so ${CORE_ONTOLOGY_FILE} was not written; move your changes into a schema note of your own and run tg upgrade again to use the shared core.`);
-  } else add(CORE_ONTOLOGY_FILE, TEMPLATES.coreSchema);
-  if (existsSync(join(root, LEGACY_ONTOLOGY_SCHEMA)) && !existsSync(join(root, ONTOLOGY_SCHEMA))) {
-    notes.push(`${LEGACY_ONTOLOGY_SCHEMA} is from an older tg init; tools read schemas from Types/, so delete it once you have moved any edits into ${ONTOLOGY_SCHEMA}.`);
+    notes.push(`${schema} declares its own ${moved.kept.map((k) => `'${k}'`).join(', ')} with changes of yours, so ${core} was not written; move your changes into a schema note of your own and run tg upgrade again to use the shared core.`);
+  } else add(core, TEMPLATES.coreSchema);
+  if (existsSync(join(root, LEGACY_ONTOLOGY_SCHEMA)) && !existsSync(join(root, schema))) {
+    notes.push(`${LEGACY_ONTOLOGY_SCHEMA} is from an older tg init; tools read schemas from ${folder}, so delete it once you have moved any edits into ${schema}.`);
   }
   // The lat.md index must list every file, or `tg check` would fail right after init.
   const indexPath = `${docs}/${docs}`;
@@ -491,14 +539,19 @@ async function chooseDocs(ctx: Ctx, root: string, flag: string | true | undefine
 export const init: Command = {
   name: 'init',
   summary: 'Set up the docs folder (lat.md/ or tg.md/), the code ontology, agent instructions, hooks, MCP, skills and your spec framework (OpenSpec, Spec Kit, Kiro, BMAD, GSD, OpenFlow, ADRs) for your coding agents (asks in a terminal; --dry-run only prints the diff)',
-  usage: `init [dir] [--agent ${AGENT_IDS.join('|')}[,...]] [--only|--skip ${PART_IDS.join('|')}[,...]] [--spec ${SPEC_IDS.join('|')}[,...]|none] [--install-spec] [--docs ${DOCS_DIRS.join('|')}] [--dry-run] [--yes] [--migrate] [--no-ontology] [--no-openspec] [--skills-only] [--no-update-check]`,
-  flags: { docs: 'string', 'dry-run': 'bool', write: 'bool', yes: 'bool', 'no-update-check': 'bool', migrate: 'bool', agent: 'string', only: 'string', skip: 'string', spec: 'string', 'install-spec': 'bool', 'no-ontology': 'bool', 'no-openspec': 'bool', 'skills-only': 'bool' },
+  usage: `init [dir] [--agent ${AGENT_IDS.join('|')}[,...]] [--only|--skip ${PART_IDS.join('|')}[,...]] [--spec ${SPEC_IDS.join('|')}[,...]|none] [--install-spec] [--docs ${DOCS_DIRS.join('|')}] [--schema-folder Types] [--dry-run] [--yes] [--migrate] [--no-ontology] [--no-openspec] [--skills-only] [--no-update-check]`,
+  flags: { docs: 'string', 'schema-folder': 'string', 'dry-run': 'bool', write: 'bool', yes: 'bool', 'no-update-check': 'bool', migrate: 'bool', agent: 'string', only: 'string', skip: 'string', spec: 'string', 'install-spec': 'bool', 'no-ontology': 'bool', 'no-openspec': 'bool', 'skills-only': 'bool' },
   noProject: true,
   async run(ctx, args, flags) {
     // Init sets up the folder it is pointed at, never a parent: a stray docs folder higher up must not capture it.
     const root = resolve(ctx.cwd, args[0] ?? (flags.has('dir') ? ctx.root : '.'));
     // `--yes` and `--json` are for scripts: no checklist, no confirmation.
     const interactive = !!ctx.choose && !!ctx.select && !ctx.json && !flags.has('yes');
+    const schema = resolveSchemaFolder(root, flags.get('schema-folder'));
+    if (schema.error) {
+      ctx.err(`${schema.error}\n`);
+      return EXIT_ERROR;
+    }
     // A newer tg brings newer instructions and skills: offer it before anything is chosen or written.
     const update = await offerUpdate(ctx, 'init', args, flags, interactive);
     if (update.relaunched !== null) return update.relaunched;
@@ -515,13 +568,13 @@ export const init: Command = {
     const specs = parts.includes('specs') ? await chooseSpecs(ctx, root, flags.get('spec'), interactive) : detectSpecs(root);
     if (!specs) return EXIT_ERROR;
     const install = parts.includes('specs') ? await installSpecs(ctx, root, specs, agents, { interactive, run: flags.has('install-spec'), dryRun: flags.has('dry-run') }) : { notes: [], installed: [] };
-    const { changes, notes } = planInit(root, agents, flags.has('migrate'), { parts, docs: docs.dir, specs });
+    const { changes, notes } = planInit(root, agents, flags.has('migrate'), { parts, docs: docs.dir, specs, schemaFolder: flags.has('schema-folder') ? schema.folder : undefined });
     notes.unshift(...update.notes, ...docs.notes, ...install.notes);
     // Writing is the default; `--dry-run` only prints the diff. `--write` is accepted for older scripts and changes nothing.
     const write = !flags.has('dry-run');
     const files = `${changes.length} file${changes.length === 1 ? '' : 's'}`;
     if (ctx.json) {
-      ctx.out(`${JSON.stringify({ root, write, agents: agents.map((a) => a.id), parts, docs: docs.dir, specs, installed: install.installed, changes: changes.map((c) => ({ path: c.path, created: c.before === null })), notes })}\n`);
+      ctx.out(`${JSON.stringify({ root, write, agents: agents.map((a) => a.id), parts, docs: docs.dir, schemaFolder: schema.folder, specs, installed: install.installed, changes: changes.map((c) => ({ path: c.path, created: c.before === null })), notes })}\n`);
     } else if (!changes.length) {
       ctx.out(`${basename(root)} is already set up; nothing to change.\n`);
     } else if (!write) {

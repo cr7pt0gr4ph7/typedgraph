@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
-import { isSpecTarget, LatIndex, parseMarkdown, readSchemaNote, schemaSetFromNotes, splitFrontmatter, type EdgeTypeSchema, type SchemaSet, type Section, type SpecIndex } from '@obsigraph/core';
+import { DEFAULT_SCHEMA_FOLDER, isSpecTarget, LatIndex, parseMarkdown, readSchemaNote, schemaSetFromNotes, splitFrontmatter, type EdgeTypeSchema, type SchemaSet, type Section, type SpecIndex } from '@obsigraph/core';
 import { parse as parseYaml } from 'yaml';
 import { EXIT_ERROR, EXIT_OK, register, type Command, type Ctx } from '../cli.mjs';
 import { unifiedDiff } from '../diff.mjs';
@@ -11,23 +11,24 @@ import { AGENTS, detectAgents } from './agents.mjs';
 import { TEMPLATES } from './gen.mjs';
 import { planInit, type Change } from './init.mjs';
 import { readSchemaNotes } from './schema.mjs';
+import { resolveSchemaFolder } from '../config.mjs';
 
-const USAGE = 'migrate [dir] [--dry-run] [--json] [--infer] [--keep-lat] [--no-setup] [--no-since] [--force]';
+const USAGE = 'migrate [dir] [--dry-run] [--json] [--infer] [--keep-lat] [--no-setup] [--no-since] [--schema-folder Types] [--force]';
 // Split so tg check does not read these patterns in this file as annotations.
 const LAT = '@' + 'lat:';
 const TG = '@' + 'tg:';
 
 // ---- ontology -----------------------------------------------------------------
 
-/** The project's ontology from `Types/`, or the bundled code ontology when it has none. */
+/** The project's ontology from its schema folder (`Types/` by default), or the bundled code ontology when it has none. */
 // @tg: implements:: [[openspec:tg-migrate#Migrate command]]
-export function migrationOntology(root: string): SchemaSet {
-  const notes = readSchemaNotes(root, 'Types/');
+export function migrationOntology(root: string, folder: string = DEFAULT_SCHEMA_FOLDER): SchemaSet {
+  const notes = readSchemaNotes(root, folder);
   const set = schemaSetFromNotes(notes.map((n) => readSchemaNote(n.path, n.frontmatter)));
   if (set.schemas.size + set.edgeTypes.size > 0) return set;
   const { yaml } = splitFrontmatter(TEMPLATES.ontologySchema);
   const fm = parseYaml(yaml ?? '') as Record<string, unknown>;
-  return schemaSetFromNotes([readSchemaNote('Types/code-types.md', fm)]);
+  return schemaSetFromNotes([readSchemaNote(`${folder}code-types.md`, fm)]);
 }
 
 // ---- file typing ----------------------------------------------------------------
@@ -260,6 +261,8 @@ export interface MigrateOptions {
   keepLat?: boolean;
   /** Also apply a single candidate relation when its sentence has no cue word. */
   infer?: boolean;
+  /** A schema folder given with `--schema-folder`: the setup records it in `.tg/config.json`. The project's own folder is read either way. */
+  schemaFolder?: string;
 }
 
 /** Everything `tg migrate` would change, without touching the disk. */
@@ -273,11 +276,11 @@ export function planMigration(project: Project, options: MigrateOptions = {}): M
 
   if (setup) {
     const agents = detectAgents(root);
-    const setupPlan = planInit(root, agents.length ? agents : AGENTS.filter((a) => a.id === 'claude'), true, { docs });
+    const setupPlan = planInit(root, agents.length ? agents : AGENTS.filter((a) => a.id === 'claude'), true, { docs, schemaFolder: options.schemaFolder });
     plan.changes.push(...setupPlan.changes);
     plan.notes.push(...setupPlan.notes);
   }
-  const set = migrationOntology(root);
+  const set = migrationOntology(root, options.schemaFolder ?? project.schemaFolder());
   const specs: SpecIndex | null = project.specIndex();
   const dates = new Map<string, Map<number, string>>();
   const dateOf = (rel: string, line: number): string | undefined => {
@@ -467,7 +470,7 @@ export const migrate: Command = {
   name: 'migrate',
   summary: 'Migrate a lat.md project to an ontology-aware tg project: type files, turn links into typed edges with metadata, upgrade @lat comments, swap the agent setup',
   usage: USAGE,
-  flags: { 'dry-run': 'bool', infer: 'bool', 'keep-lat': 'bool', 'no-setup': 'bool', 'no-since': 'bool', force: 'bool' },
+  flags: { 'dry-run': 'bool', infer: 'bool', 'keep-lat': 'bool', 'no-setup': 'bool', 'no-since': 'bool', 'schema-folder': 'string', force: 'bool' },
   noProject: true,
   run(ctx: Ctx, args, flags) {
     const root = resolve(ctx.cwd, args[0] ?? '.');
@@ -475,9 +478,15 @@ export const migrate: Command = {
       ctx.err(`${root} has no lat.md/ or tg.md/ docs folder; nothing to migrate. Run tg init to start one.\n`);
       return EXIT_ERROR;
     }
+    const schemaFlag = flags.get('schema-folder');
+    const schema = resolveSchemaFolder(root, schemaFlag);
+    if (schema.error) {
+      ctx.err(`${schema.error}\n`);
+      return EXIT_ERROR;
+    }
     let project: Project;
     try {
-      project = new Project(root);
+      project = new Project(root, { schemaFolder: schema.folder });
     } catch (e) {
       if (e instanceof NoLatDir) {
         ctx.err(`${e.message}\n`);
@@ -485,7 +494,7 @@ export const migrate: Command = {
       }
       throw e;
     }
-    const plan = planMigration(project, { setup: !flags.has('no-setup'), since: !flags.has('no-since'), keepLat: flags.has('keep-lat'), infer: flags.has('infer') });
+    const plan = planMigration(project, { setup: !flags.has('no-setup'), since: !flags.has('no-since'), keepLat: flags.has('keep-lat'), infer: flags.has('infer'), schemaFolder: typeof schemaFlag === 'string' ? schema.folder : undefined });
     const write = !flags.has('dry-run');
     const escaping = outsideRoot(root, plan.changes.map((c) => c.path));
     if (escaping.length) {

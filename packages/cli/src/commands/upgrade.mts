@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { isMap, isScalar, isSeq, parse as parseYaml, parseDocument, visit, type Document, type Node } from 'yaml';
 import type { SpecFrameworkId } from '@obsigraph/core';
-import { EXIT_OK, register, VERSION, type Command, type Ctx } from '../cli.mjs';
+import { EXIT_ERROR, EXIT_OK, register, VERSION, type Command, type Ctx } from '../cli.mjs';
+import { CONFIG_FILE, resolveSchemaFolder } from '../config.mjs';
 import { unifiedDiff } from '../diff.mjs';
 import { existingDocsDir, type DocsDir } from '../root.mjs';
 import { detectSpecs, SPEC_ONTOLOGY_FILE } from '../specs.mjs';
@@ -10,9 +11,8 @@ import { CORE_ONTOLOGY_FILE } from '../core-ontology.mjs';
 import { offerUpdate } from '../update.mjs';
 import { AGENTS, detectAgents, type Agent } from './agents.mjs';
 import { SKILLS, TEMPLATES } from './gen.mjs';
-import { BEGIN, forDocs, planInit, type Change, type Part } from './init.mjs';
+import { BEGIN, forDocs, forSchema, inSchemaFolder, ONTOLOGY_SCHEMA, planInit, type Change, type Part } from './init.mjs';
 
-const ONTOLOGY_SCHEMA = 'Types/code-types.md';
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---(\r?\n|$)/;
 
 function read(path: string): string | null {
@@ -29,6 +29,8 @@ export interface Setup {
   parts: Part[];
   docs: DocsDir;
   specs: SpecFrameworkId[];
+  /** The schema folder the ontology lives in, with a trailing slash (`Types/`). */
+  schemaFolder: string;
 }
 
 /**
@@ -38,7 +40,7 @@ export interface Setup {
  * these and adds nothing the project never chose.
  */
 // @tg: implements:: [[openspec:tg-upgrade#Project refresh]]
-export function detectSetup(root: string): Setup {
+export function detectSetup(root: string, schemaFolder: string = resolveSchemaFolder(root, undefined).folder): Setup {
   const hasBlock = (a: Agent) => (a.instructions === '.cursor/rules/tg.mdc' ? existsSync(join(root, a.instructions)) : (read(join(root, a.instructions)) ?? '').includes(BEGIN));
   const hasSkills = (a: Agent) => Object.keys(SKILLS).some((s) => existsSync(join(root, a.skills, s, 'SKILL.md')));
   // Agents that share AGENTS.md or a skills folder count only when their own folder is there too.
@@ -51,8 +53,8 @@ export function detectSetup(root: string): Setup {
   const specs = detectSpecs(root);
   if (specs.length) parts.push('specs');
   const docs = existingDocsDir(root) ?? 'lat.md';
-  if (existsSync(join(root, ONTOLOGY_SCHEMA)) || existsSync(join(root, docs, 'code-ontology.md'))) parts.push('ontology');
-  return { agents, parts, docs, specs };
+  if (existsSync(join(root, inSchemaFolder(ONTOLOGY_SCHEMA, schemaFolder))) || existsSync(join(root, docs, 'code-ontology.md'))) parts.push('ontology');
+  return { agents, parts, docs, specs, schemaFolder };
 }
 
 const SHORT = 40;
@@ -133,12 +135,18 @@ export function enrichOntology(existing: string, bundled: string): { text: strin
   return { text: `---\n${yaml}\n---${mine[2] ?? '\n'}${existing.slice(mine[0].length)}`, added };
 }
 
-/** Changes that refresh what the project has; new files only for tg skills and the spec ontology tg owns. */
+/**
+ * Changes that refresh what the project has; new files only for tg skills, the spec ontology and shared core tg
+ * owns, and, when `record` (a `--schema-folder` was given), the `.tg/config.json` that records the schema folder.
+ */
 // @tg: implements:: [[openspec:tg-upgrade#Project refresh]]
-export function planUpgrade(root: string, setup: Setup): { changes: Change[]; notes: string[]; ontology: string[] } {
-  const { changes, notes } = planInit(root, setup.agents, false, { parts: setup.parts, docs: setup.docs, specs: setup.specs });
+export function planUpgrade(root: string, setup: Setup, options: { record?: boolean } = {}): { changes: Change[]; notes: string[]; ontology: string[] } {
+  const folder = setup.schemaFolder;
+  const { changes, notes } = planInit(root, setup.agents, false, { parts: setup.parts, docs: setup.docs, specs: setup.specs, schemaFolder: options.record ? folder : undefined });
   const skillDirs = new Set(setup.agents.map((a) => a.skills));
-  const owned = (c: Change) => c.before !== null || c.path === SPEC_ONTOLOGY_FILE || c.path === CORE_ONTOLOGY_FILE || [...skillDirs].some((d) => Object.keys(SKILLS).some((s) => c.path === `${d}/${s}/SKILL.md`));
+  const schema = inSchemaFolder(ONTOLOGY_SCHEMA, folder);
+  const tgOwned = new Set([inSchemaFolder(SPEC_ONTOLOGY_FILE, folder), inSchemaFolder(CORE_ONTOLOGY_FILE, folder), ...(options.record ? [CONFIG_FILE, '.tg/.gitignore'] : [])]);
+  const owned = (c: Change) => c.before !== null || tgOwned.has(c.path) || [...skillDirs].some((d) => Object.keys(SKILLS).some((s) => c.path === `${d}/${s}/SKILL.md`));
   const kept = changes.filter(owned);
   // A note about a file upgrade does not create (a proposed `.tg/config.json`, a docs index) would only confuse.
   const dropped = changes.filter((c) => !owned(c)).map((c) => c.path);
@@ -148,19 +156,19 @@ export function planUpgrade(root: string, setup: Setup): { changes: Change[]; no
   let ontology: string[] = [];
   if (setup.parts.includes('ontology')) {
     // Enrichment builds on the plan's own change to the schema (edge types moved to the shared core), if any.
-    const planned = kept.find((c) => c.path === ONTOLOGY_SCHEMA);
-    const existing = read(join(root, ONTOLOGY_SCHEMA));
+    const planned = kept.find((c) => c.path === schema);
+    const existing = read(join(root, schema));
     const base = planned?.after ?? existing;
-    const r = base === null ? null : enrichOntology(base, forDocs(TEMPLATES.ontologySchema, setup.docs));
+    const r = base === null ? null : enrichOntology(base, forSchema(forDocs(TEMPLATES.ontologySchema, setup.docs), folder));
     if (r) {
       if (planned) planned.after = r.text;
-      else kept.push({ path: ONTOLOGY_SCHEMA, before: existing, after: r.text });
+      else kept.push({ path: schema, before: existing, after: r.text });
       ontology = r.added;
     }
     const guide = `${setup.docs}/code-ontology.md`;
     const text = read(join(root, guide));
     const body = (t: string) => t.replace(FRONTMATTER, '').trim();
-    if (text !== null && body(text) !== body(forDocs(TEMPLATES.ontologyGuide, setup.docs))) {
+    if (text !== null && body(text) !== body(forSchema(forDocs(TEMPLATES.ontologyGuide, setup.docs), folder))) {
       notes.push(`${guide} differs from the guide in this tg version; it is yours, so it is left as is. Compare with tg gen ontology.md.`);
     }
   }
@@ -170,28 +178,34 @@ export function planUpgrade(root: string, setup: Setup): { changes: Change[]; no
 export const upgrade: Command = {
   name: 'upgrade',
   summary: 'Check for a newer tg, then refresh the instructions, skills, hooks, spec steps and ontology an earlier tg init set up (asks in a terminal; --dry-run only prints the diff)',
-  usage: 'upgrade [dir] [--dry-run] [--yes] [--no-update-check]',
-  flags: { 'dry-run': 'bool', yes: 'bool', 'no-update-check': 'bool' },
+  usage: 'upgrade [dir] [--schema-folder Types] [--dry-run] [--yes] [--no-update-check]',
+  flags: { 'schema-folder': 'string', 'dry-run': 'bool', yes: 'bool', 'no-update-check': 'bool' },
   noProject: true,
   // @tg: implements:: [[openspec:tg-upgrade#Upgrade command]]
   async run(ctx: Ctx, args, flags) {
     const root = resolve(ctx.cwd, args[0] ?? ctx.root);
     const interactive = !!ctx.select && !ctx.json && !flags.has('yes');
+    const schemaFlag = flags.get('schema-folder');
+    const schema = resolveSchemaFolder(root, schemaFlag);
+    if (schema.error) {
+      ctx.err(`${schema.error}\n`);
+      return EXIT_ERROR;
+    }
     const update = await offerUpdate(ctx, 'upgrade', args, flags, interactive);
     if (update.relaunched !== null) return update.relaunched;
-    const setup = detectSetup(root);
+    const setup = detectSetup(root, schema.folder);
     if (!setup.parts.length) {
       if (ctx.json) ctx.out(`${JSON.stringify({ root, version: ctx.version ?? VERSION, latest: update.latest, setup: null, changes: [], notes: update.notes })}\n`);
       else ctx.out(`${basename(root)} has no tg setup to upgrade; run tg init.\n`);
       return EXIT_OK;
     }
-    const plan = planUpgrade(root, setup);
+    const plan = planUpgrade(root, setup, { record: typeof schemaFlag === 'string' });
     const notes = [...update.notes, ...plan.notes];
     const dryRun = flags.has('dry-run');
     let write = !dryRun;
     if (ctx.json) {
       ctx.out(
-        `${JSON.stringify({ root, version: ctx.version ?? VERSION, latest: update.latest, write, setup: { agents: setup.agents.map((a) => a.id), parts: setup.parts, docs: setup.docs, specs: setup.specs }, changes: plan.changes.map((c) => ({ path: c.path, created: c.before === null })), ontology: plan.ontology, notes })}\n`,
+        `${JSON.stringify({ root, version: ctx.version ?? VERSION, latest: update.latest, write, setup: { agents: setup.agents.map((a) => a.id), parts: setup.parts, docs: setup.docs, specs: setup.specs, schemaFolder: setup.schemaFolder }, changes: plan.changes.map((c) => ({ path: c.path, created: c.before === null })), ontology: plan.ontology, notes })}\n`,
       );
     } else if (!plan.changes.length) {
       for (const n of notes) ctx.out(`Note: ${n}\n`);
@@ -200,7 +214,7 @@ export const upgrade: Command = {
     } else {
       ctx.out(`tg ${ctx.version ?? VERSION} has newer files for ${basename(root)} (${setup.parts.join(', ')}; ${setup.agents.map((a) => a.name).join(', ')}):\n`);
       for (const c of plan.changes) ctx.out(`  ${c.before === null ? '+ new    ' : '~ updated'} ${c.path}\n`);
-      if (plan.ontology.length) ctx.out(`  ${ONTOLOGY_SCHEMA} gains ${plan.ontology.length} description${plan.ontology.length === 1 ? '' : 's'} or declaration${plan.ontology.length === 1 ? '' : 's'}; nothing in it is overwritten.\n`);
+      if (plan.ontology.length) ctx.out(`  ${inSchemaFolder(ONTOLOGY_SCHEMA, setup.schemaFolder)} gains ${plan.ontology.length} description${plan.ontology.length === 1 ? '' : 's'} or declaration${plan.ontology.length === 1 ? '' : 's'}; nothing in it is overwritten.\n`);
       for (const n of notes) ctx.out(`Note: ${n}\n`);
       if (dryRun) {
         for (const c of plan.changes) ctx.out(`\n${unifiedDiff(c.path, c.before, c.after)}\n`);

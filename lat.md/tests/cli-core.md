@@ -1,5 +1,6 @@
 ---
 type: Scenario
+openspec: ["tg-cli#Schema folder"]
 lat:
   require-code-mention: true
 ---
@@ -70,3 +71,27 @@ With both folders present every command reads `lat.md/`, so a section only in `t
 ### Hook names the folder
 
 The prompt hook of a `tg.md/` project reminds the agent to keep `tg.md/` in sync and never mentions `lat.md/`.
+
+## Schema folder
+
+How commands find the schema folder, described in [[cli#Code ontology#Schema folder]].
+
+### Flag over config over default
+
+`--schema-folder` wins over `schemaFolder` in `.tg/config.json`, which wins over `Types/`; `./Ontology/` reads as `Ontology/`, and absolute, `..` and root values are refused.
+
+### Broken config key
+
+A `schemaFolder` that is not a folder path is reported as a config error, falls back to `Types/` and keeps the `notes` globs.
+
+### Schema text follows the folder
+
+`Types/` in written text becomes the schema folder only where it names the folder, not inside `MyTypes/` or `a/Types/`.
+
+### Reading commands
+
+With the config naming `Ontology/`, `ontology` lists its types, `cypher` finds the element node its schema declares (and none with `--schema-folder Nothing`), `validate` and `schema export` read it, and `migrate` types a link from it.
+
+### Bad flag value
+
+`--schema-folder ../up` exits 2 with the same message in `cypher`, `ontology`, `ontology check`, `validate`, `schema export`, `migrate`, `init` and `upgrade`.
