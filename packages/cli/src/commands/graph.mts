@@ -2,6 +2,7 @@ import { BuiltinEngine, buildLatGraph, CypherError, isSpecTarget, resultToJson, 
 import { parseYaml } from '@obsigraph/node-vault';
 import { EXIT_ERROR, EXIT_FINDINGS, EXIT_OK, register, type Command } from '../cli.mjs';
 import { NoLatDir, Project } from '../project.mjs';
+import { resolveSchemaFolder } from '../config.mjs';
 
 // @tg: implements:: [[openspec:code-layer#Code mode setting]]
 function codeMode(flag: string | true | undefined, env: string | undefined): CodeMode {
@@ -23,17 +24,22 @@ function cell(v: Value): string {
 export const cypher: Command = {
   name: 'cypher',
   summary: 'Run a read-only openCypher query over the section graph',
-  usage: 'cypher [--code off|annotated|all] "<query>"',
-  flags: { code: 'string' },
+  usage: 'cypher [--code off|annotated|all] [--schema-folder Types] "<query>"',
+  flags: { code: 'string', 'schema-folder': 'string' },
   run(ctx, args, flags) {
     const query = args.join(' ').trim();
     if (!query) {
       ctx.err('usage: tg cypher "<query>"\n');
       return EXIT_ERROR;
     }
+    const schema = resolveSchemaFolder(ctx.root, flags.get('schema-folder'));
+    if (schema.error) {
+      ctx.err(`${schema.error}\n`);
+      return EXIT_ERROR;
+    }
     let project: Project;
     try {
-      project = new Project(ctx.root);
+      project = new Project(ctx.root, { schemaFolder: schema.folder });
     } catch (e) {
       if (e instanceof NoLatDir) {
         ctx.err(`${e.message}\n`);

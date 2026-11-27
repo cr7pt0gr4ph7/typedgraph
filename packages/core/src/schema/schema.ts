@@ -149,6 +149,21 @@ export function normalizeFolder(folder: string): string {
   return f === '' ? '' : f.endsWith('/') ? f : `${f}/`;
 }
 
+/** A schema folder as a project config writes it: forward slashes, no leading `./`, no trailing slash (`Types`). */
+export function configFolder(folder: string): string {
+  return folder.trim().replaceAll('\\', '/').replace(/^(\.\/)+/, '').replace(/\/+$/, '');
+}
+
+/** Why a schema folder from a flag or a project config cannot be used, or null when it can: a folder below the project root. */
+export function schemaFolderProblem(value: unknown): string | null {
+  if (typeof value !== 'string') return 'must be a folder path';
+  const v = configFolder(value);
+  if (!v || v === '.') return 'must name a folder below the project root';
+  if (v.startsWith('/') || /^[A-Za-z]:/.test(v)) return 'must be relative to the project root';
+  if (v.split('/').some((p) => p === '..')) return 'must stay inside the project';
+  return null;
+}
+
 /** True when `path` is a markdown note directly inside the schema folder. */
 // @tg: implements:: [[openspec:schema-notes#Schema notes are discovered by location]]
 export function isSchemaPath(path: string, folder: string): boolean {
