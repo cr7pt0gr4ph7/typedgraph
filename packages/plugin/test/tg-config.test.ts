@@ -1,13 +1,30 @@
 import { describe, expect, it, vi } from 'vitest';
-import { schemaFolderOf, syncOnLoad, TG_CONFIG_PATH, TgConfigSync, withSchemaFolder, type ConfigAdapter } from '../src/tg-config';
+import { schemaFolderOf, syncOnLoad, TG_CONFIG_PATH, TgConfigSync, TgConfigWatch, withSchemaFolder, type ConfigAdapter } from '../src/tg-config';
 
-vi.mock('obsidian', () => ({ App: class App {}, PluginSettingTab: class PluginSettingTab {}, Setting: class Setting {} }));
+vi.mock('obsidian', () => {
+  class TFile {
+    constructor(readonly path: string) {}
+  }
+  /** Stands in for Obsidian's file outside the index: it records who holds it. */
+  class TExternalFile extends TFile {
+    users = new Set<unknown>();
+    addUser(user: unknown) {
+      this.users.add(user);
+    }
+    removeUser(user: unknown) {
+      this.users.delete(user);
+    }
+  }
+  return { App: class App {}, PluginSettingTab: class PluginSettingTab {}, Setting: class Setting {}, TFile, TExternalFile };
+});
+const { TFile, TExternalFile } = (await import('obsidian')) as unknown as {
+  TFile: new (path: string) => { path: string };
+  TExternalFile: new (path: string) => { path: string; users: Set<unknown> };
+};
 
-/** An in-memory vault adapter: `touch` bumps a file's modification time as an outside edit would. */
+/** An in-memory vault adapter. */
 function memory(files: Record<string, string> = {}) {
   const data = new Map(Object.entries(files));
-  const mtimes = new Map([...data.keys()].map((k) => [k, 1]));
-  let clock = 1;
   const adapter: ConfigAdapter = {
     exists: async (p) => data.has(p) || [...data.keys()].some((k) => k.startsWith(`${p}/`)),
     read: async (p) => {
@@ -15,17 +32,10 @@ function memory(files: Record<string, string> = {}) {
       if (t === undefined) throw new Error(`no ${p}`);
       return t;
     },
-    write: async (p, d) => {
-      data.set(p, d);
-      mtimes.set(p, ++clock);
-    },
+    write: async (p, d) => void data.set(p, d),
     mkdir: async () => {},
-    stat: async (p) => (data.has(p) ? { mtime: mtimes.get(p)! } : null),
   };
-  const touch = (p: string, text: string) => {
-    data.set(p, text);
-    mtimes.set(p, ++clock);
-  };
+  const touch = (p: string, text: string) => void data.set(p, text);
   return { adapter, data, touch };
 }
 
@@ -94,19 +104,47 @@ describe('tg config sync', () => {
   // @tg: verifies:: [[tests/schema-notes#Schema folder from tg config#File change updates the setting]] {level: unit}
   // @lat: [[tests/schema-notes#Schema folder from tg config#File change updates the setting]]
   // @tg: verifies:: [[openspec:schema-notes#Schema folder from the project config#Two-way sync]]
-  it('adopts an outside edit of the file when polled, and only once', async () => {
+  it('adopts an outside edit of the file once, and its own write changes nothing', async () => {
     const { s, touch, settings, setFolder } = sync({ [TG_CONFIG_PATH]: '{"schemaFolder": "Types"}' });
     expect(await s.pull()).toBe(false);
-    expect(await s.poll()).toBe(false);
     touch(TG_CONFIG_PATH, '{"schemaFolder": "Ontology"}');
-    expect(await s.poll()).toBe(true);
+    expect(await s.pull()).toBe(true);
     expect(settings.schemaFolder).toBe('Ontology/');
-    expect(await s.poll()).toBe(false);
+    expect(await s.pull()).toBe(false);
     expect(setFolder).toHaveBeenCalledTimes(1);
-    // Its own write is not mistaken for an outside edit.
+    // The modify event for the plugin's own write pulls the folder it just wrote.
     settings.schemaFolder = 'Schemas/';
     await s.push();
-    expect(await s.poll()).toBe(false);
+    expect(await s.pull()).toBe(false);
+  });
+
+  // @tg: verifies:: [[tests/schema-notes#Schema folder from tg config#External change monitoring]] {level: unit}
+  // @lat: [[tests/schema-notes#Schema folder from tg config#External change monitoring]]
+  // @tg: verifies:: [[openspec:schema-notes#Schema folder from the project config#Two-way sync]]
+  it('holds .tg/config.json under external change monitoring from start until stop, keyed by its user', () => {
+    const file = new TExternalFile(TG_CONFIG_PATH);
+    const files = new Map<string, unknown>();
+    const vault = { getFileByPath: vi.fn((p: string) => (files.get(p) ?? null) as never) };
+    const user = {};
+    const watch = new TgConfigWatch(vault, user);
+    // No file yet: nothing to monitor, and a later start tries again.
+    expect(watch.start()).toBe(false);
+    files.set(TG_CONFIG_PATH, file);
+    expect(watch.start()).toBe(true);
+    expect(vault.getFileByPath).toHaveBeenLastCalledWith(TG_CONFIG_PATH);
+    expect([...file.users]).toEqual([user]);
+    // A second start keeps the one hold; stop releases it, and a second stop does nothing.
+    expect(watch.start()).toBe(true);
+    expect(vault.getFileByPath).toHaveBeenCalledTimes(2);
+    watch.stop();
+    watch.stop();
+    expect(file.users.size).toBe(0);
+    expect(watch.matches(file as never)).toBe(true);
+    expect(watch.matches(new TFile('Types/code-types.md') as never)).toBe(false);
+    // An indexed file needs no monitoring and gets no user.
+    const indexed = new TgConfigWatch({ getFileByPath: () => new TFile(TG_CONFIG_PATH) as never }, user);
+    expect(indexed.start()).toBe(true);
+    indexed.stop();
   });
 });
 

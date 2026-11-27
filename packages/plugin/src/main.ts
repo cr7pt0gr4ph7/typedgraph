@@ -12,7 +12,7 @@ import { DiagnosticsModal, registerSchemaCommands } from './schema-commands';
 import { registerTgIcon, TG_ICON } from './icon';
 import { noteScope, obsidianIgnored } from './note-scope';
 import { statusCount, type StatusCount } from './status-count';
-import { syncOnLoad, TG_CONFIG_POLL_MS, TgConfigSync, type ConfigAdapter } from './tg-config';
+import { syncOnLoad, TgConfigSync, TgConfigWatch, type ConfigAdapter } from './tg-config';
 
 /** Pause after the last folder-setting edit before the vault is re-indexed. */
 const REINDEX_DELAY_MS = 800;
@@ -32,6 +32,8 @@ export default class ObsigraphPlugin extends Plugin {
   private reindexing: Promise<void> = Promise.resolve();
   /** Keeps the schema folder in step with `.tg/config.json` while "Sync settings with .tg/config.json" is on. */
   tgConfig!: TgConfigSync;
+  /** Holds `.tg/config.json` under Obsidian's external change monitoring while sync is on. */
+  private tgWatch!: TgConfigWatch;
 
   // @tg: implements:: [[openspec:graph-query-block#Block structure]]
   async onload(): Promise<void> {
@@ -40,6 +42,7 @@ export default class ObsigraphPlugin extends Plugin {
       () => this.settings.schemaFolder,
       (folder) => this.applySchemaFolder(folder),
     );
+    this.tgWatch = new TgConfigWatch(this.app.vault, this.tgConfig);
     await this.loadSettings();
     this.index = new VaultIndex(
       this.app,
@@ -61,8 +64,13 @@ export default class ObsigraphPlugin extends Plugin {
         ),
     );
     this.addSettingTab(new ObsigraphSettingTab(this.app, this));
-    // Obsidian reports no changes inside dot folders, so the config is checked on a timer while sync is on.
-    this.registerInterval(window.setInterval(() => void (this.settings.syncTgConfig ? this.tgConfig.poll() : null), TG_CONFIG_POLL_MS));
+    // `.tg/config.json` is outside Obsidian's index; while it is monitored, edits to it arrive as `modify` events.
+    this.registerEvent(
+      this.app.vault.on('modify', (file) => {
+        if (this.settings.syncTgConfig && this.tgWatch.matches(file)) void this.tgConfig.pull();
+      }),
+    );
+    if (this.settings.syncTgConfig) this.tgWatch.start();
 
     this.registerMarkdownCodeBlockProcessor('graph-query', (source, el, ctx) => {
       ctx.addChild(new QueryBlock(el, source, ctx.sourcePath, this));
@@ -132,6 +140,7 @@ export default class ObsigraphPlugin extends Plugin {
       window.clearTimeout(this.pushTimer);
       if (this.settings.syncTgConfig) void this.tgConfig.push();
     }
+    this.tgWatch?.stop();
     this.index?.destroy();
   }
 
@@ -185,7 +194,8 @@ export default class ObsigraphPlugin extends Plugin {
       if (this.pushTimer !== null) window.clearTimeout(this.pushTimer);
       this.pushTimer = window.setTimeout(() => {
         this.pushTimer = null;
-        void this.tgConfig.push();
+        // A file the push just created is monitored from now on.
+        void this.tgConfig.push().then(() => this.settings.syncTgConfig && this.tgWatch.start());
       }, REINDEX_DELAY_MS);
     }
   }
@@ -202,6 +212,8 @@ export default class ObsigraphPlugin extends Plugin {
   /** Turn "Sync settings with .tg/config.json" on or off. Turning it on adopts the file's folder, or writes the setting's when the file names none. */
   async setTgConfigSync(on: boolean): Promise<void> {
     this.settings.syncTgConfig = on;
+    if (on) this.tgWatch.start();
+    else this.tgWatch.stop();
     if (on && (await this.tgConfig.pull())) return;
     await this.saveSettings();
   }

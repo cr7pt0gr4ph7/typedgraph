@@ -7,7 +7,7 @@
 
 ## 2. Obsidian plugin
 
-- [x] 2.1 Add `TgConfigSync` (pull, push, poll) over the vault adapter
+- [x] 2.1 Add `TgConfigSync` (pull, push) over the vault adapter, and `TgConfigWatch`, which holds the file's `TExternalFile` as a user so its changes arrive as `modify` events
 - [x] 2.2 Add the "Sync settings with .tg/config.json" setting to both settings UIs; on for a new configuration when the file exists
 
 ## 3. VS Code extension

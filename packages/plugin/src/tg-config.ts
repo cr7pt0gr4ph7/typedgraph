@@ -1,10 +1,8 @@
 import { configFolder, normalizeFolder, schemaFolderProblem } from '@obsigraph/core';
+import { TExternalFile, type TAbstractFile, type TFile, type Vault } from 'obsidian';
 
 /** The tg CLI's committed project config, relative to the vault root. */
 export const TG_CONFIG_PATH = '.tg/config.json';
-
-/** How often the file is checked for changes while sync is on: Obsidian sends no vault events for dot folders. */
-export const TG_CONFIG_POLL_MS = 3000;
 
 /** The schema folder `.tg/config.json` names, with a trailing slash; null when the file names none or an unusable one. */
 export function schemaFolderOf(text: string | null): string | null {
@@ -40,18 +38,15 @@ export interface ConfigAdapter {
   read(path: string): Promise<string>;
   write(path: string, data: string): Promise<void>;
   mkdir(path: string): Promise<void>;
-  stat(path: string): Promise<{ mtime: number } | null>;
 }
 
 /**
  * Two-way sync of the plugin's schema folder with `schemaFolder` in `.tg/config.json`, so the plugin and the tg
- * CLI read the same folder: `pull` adopts the file's folder, `push` writes the setting into the file, and `poll`
- * pulls when the file changed on disk.
+ * CLI read the same folder: `pull` adopts the file's folder and `push` writes the setting into the file.
+ * {@link TgConfigWatch} says when the file changed.
  */
 // @tg: implements:: [[openspec:schema-notes#Schema folder from the project config]]
 export class TgConfigSync {
-  private mtime: number | null = null;
-
   constructor(
     private readonly adapter: ConfigAdapter,
     private readonly getFolder: () => string,
@@ -65,9 +60,7 @@ export class TgConfigSync {
   private async read(): Promise<string | null> {
     try {
       if (!(await this.adapter.exists(TG_CONFIG_PATH))) return null;
-      const text = await this.adapter.read(TG_CONFIG_PATH);
-      this.mtime = (await this.adapter.stat(TG_CONFIG_PATH))?.mtime ?? null;
-      return text;
+      return await this.adapter.read(TG_CONFIG_PATH);
     } catch {
       return null;
     }
@@ -98,22 +91,48 @@ export class TgConfigSync {
     try {
       if (!(await this.adapter.exists('.tg'))) await this.adapter.mkdir('.tg');
       await this.adapter.write(TG_CONFIG_PATH, next);
-      this.mtime = (await this.adapter.stat(TG_CONFIG_PATH))?.mtime ?? null;
     } catch {
       // A read-only vault keeps the setting; the next change tries again.
     }
   }
+}
 
-  /** Pull when the file's modification time moved since it was last read or written. */
-  async poll(): Promise<boolean> {
-    let mtime: number | null = null;
-    try {
-      mtime = (await this.adapter.stat(TG_CONFIG_PATH))?.mtime ?? null;
-    } catch {
-      mtime = null;
-    }
-    if (mtime === null || mtime === this.mtime) return false;
-    return this.pull();
+/**
+ * Change monitoring for `.tg/config.json`. Obsidian does not index dot folders, so `Vault.getFileByPath` returns a
+ * `TExternalFile` for it, which reports external changes as vault `modify` events only while it has a user. The
+ * watch is that user, keyed by `user`, from `start` until `stop`.
+ */
+// @tg: implements:: [[openspec:schema-notes#Schema folder from the project config]]
+export class TgConfigWatch {
+  private file: TFile | null = null;
+
+  constructor(
+    private readonly vault: Pick<Vault, 'getFileByPath'>,
+    private readonly user: unknown,
+  ) {}
+
+  /** Start monitoring the file when it exists and is not monitored yet; true while it is monitored. */
+  start(): boolean {
+    if (this.file) return true;
+    const file = this.vault.getFileByPath(TG_CONFIG_PATH);
+    if (!file) return false;
+    // `TExternalFile` is missing from Obsidian versions before it, where `instanceof` would throw.
+    typeof TExternalFile === 'function' && file instanceof TExternalFile && file.addUser(this.user);
+    this.file = file;
+    return true;
+  }
+
+  /** Stop monitoring; the last user's release also clears Obsidian's cached data for the file. */
+  stop(): void {
+    const file = this.file;
+    if (!file) return;
+    this.file = null;
+    typeof TExternalFile === 'function' && file instanceof TExternalFile && file.removeUser(this.user);
+  }
+
+  /** True for a vault `modify` event about `.tg/config.json`. */
+  matches(file: TAbstractFile): boolean {
+    return file.path === TG_CONFIG_PATH;
   }
 }
 

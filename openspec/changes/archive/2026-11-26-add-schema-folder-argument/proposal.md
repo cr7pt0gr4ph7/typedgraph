@@ -8,7 +8,7 @@
 - **`schemaFolder` in `.tg/config.json`.** Without the flag, every schema command reads the folder from the committed project config, then falls back to `Types/`. A broken value is reported and does not hide the `notes` globs.
 - **Init and upgrade write into the folder.** `code-types.md`, `core-types.md` and `spec-types.md` go into the schema folder. The instructions, skills, Cursor rules, ontology guide and spec ontology name it. A folder given with the flag that differs from the project's is recorded in `.tg/config.json`; the default folder writes no config.
 - **VS Code follows `.tg/config.json`.** New Typed Note and the Luhmann commands read the config's `schemaFolder`, re-read on every use. `typegraph.schemaFolder` now defaults to empty and overrides the config only when the user sets it.
-- **Obsidian plugin: "Sync settings with .tg/config.json".** A new setting keeps the plugin's schema folder and the config's `schemaFolder` in step both ways. It is on for a new configuration when the vault has the file. Obsidian sends no events for dot folders, so the file is polled every three seconds while sync is on.
+- **Obsidian plugin: "Sync settings with .tg/config.json".** A new setting keeps the plugin's schema folder and the config's `schemaFolder` in step both ways. It is on for a new configuration when the vault has the file. Obsidian does not index dot folders, so the plugin holds the file's `TExternalFile` as a user while sync is on, and Obsidian reports its external changes as `modify` events.
 
 ## Capabilities
 

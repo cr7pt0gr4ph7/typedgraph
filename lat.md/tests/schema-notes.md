@@ -114,7 +114,11 @@ A new schema folder is written into the file with its other keys kept, a file th
 
 ### File change updates the setting
 
-An outside edit of the file is adopted on the next poll, once; the plugin's own write is not taken for an outside edit.
+An outside edit of the file is adopted when pulled, once; pulling after the plugin's own write changes nothing.
+
+### External change monitoring
+
+The watch gets `.tg/config.json` with `Vault.getFileByPath`, adds its user to the `TExternalFile` on start, once, and removes it on stop; a missing file is tried again on the next start, and an indexed file gets no user.
 
 ### Sync toggle in the settings
 
