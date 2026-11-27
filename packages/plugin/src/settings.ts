@@ -14,6 +14,8 @@ export interface ObsigraphSettings {
   edgeStyles: Record<string, EdgeStyle>;
   /** Folder whose notes declare type schemas. */
   schemaFolder: string;
+  /** Keep the schema folder and `schemaFolder` in the vault's `.tg/config.json` (the tg CLI's config) in step, both ways. */
+  syncTgConfig: boolean;
   /** Base IRI for schema declarations without a `uri`, used by SHACL export and import. */
   schemaBaseIri: string;
   /** Show the diagnostics count in the status bar. */
@@ -52,6 +54,7 @@ export const DEFAULT_SETTINGS: ObsigraphSettings = {
   typeStyles: {},
   edgeStyles: {},
   schemaFolder: DEFAULT_SCHEMA_FOLDER,
+  syncTgConfig: false,
   schemaBaseIri: DEFAULT_BASE_IRI,
   showDiagnostics: true,
   maxPathDepth: DEFAULT_MAX_PATH_DEPTH,
@@ -67,6 +70,9 @@ export const DEFAULT_SETTINGS: ObsigraphSettings = {
   excludeFolders: '',
   obsidianExcluded: false,
 };
+
+const SYNC_TG_CONFIG_DESC =
+  "Keep the schema folder the same as schemaFolder in the vault's .tg/config.json, the tg command line's config: a change on either side is copied to the other. On for a new configuration when the vault has that file.";
 
 const INDEX_FOLDERS_DESC = 'Only notes in these folders are indexed, one folder per line. Leave empty to index the whole vault. The schema folder is always indexed.';
 const EXCLUDE_FOLDERS_DESC = 'Notes in these folders are not indexed, one folder per line. Links into them end at stub nodes, as links to missing notes do. Re-indexes the vault when changed.';
@@ -189,6 +195,11 @@ export class ObsigraphSettingTab extends PluginSettingTab {
           await this.plugin.saveSettings();
         }),
       );
+
+    new Setting(containerEl)
+      .setName('Sync settings with .tg/config.json')
+      .setDesc(SYNC_TG_CONFIG_DESC)
+      .addToggle((t) => t.setValue(this.plugin.settings.syncTgConfig).onChange(async (v) => this.plugin.setTgConfigSync(v)));
 
     new Setting(containerEl)
       .setName('Schema base IRI')
@@ -368,6 +379,7 @@ export class ObsigraphSettingTab extends PluginSettingTab {
         heading: 'Types and styles',
         items: [
           { name: 'Schema folder', desc: 'Each note directly in this folder declares the schema for the type named by its title.', control: { type: 'folder', key: 'schemaFolder' } },
+          { name: 'Sync settings with .tg/config.json', desc: SYNC_TG_CONFIG_DESC, aliases: ['tg config', 'cli'], control: { type: 'toggle', key: 'syncTgConfig' } },
           { name: 'Schema base IRI', desc: 'Names types, properties and edge types without a `uri` when exporting to or importing from SHACL.', control: { type: 'text', key: 'schemaBaseIri', placeholder: DEFAULT_BASE_IRI } },
           {
             name: 'Frontmatter links as edges',
@@ -410,6 +422,10 @@ export class ObsigraphSettingTab extends PluginSettingTab {
     // Same effects as the legacy display() controls.
     if (key === 'codeMode') {
       await this.plugin.setCodeMode(value === 'all' ? 'all' : value === 'annotated' ? 'annotated' : 'off');
+      return;
+    }
+    if (key === 'syncTgConfig') {
+      await this.plugin.setTgConfigSync(value === true);
       return;
     }
     const settings = this.plugin.settings as unknown as Record<string, unknown>;
