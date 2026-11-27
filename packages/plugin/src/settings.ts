@@ -264,43 +264,15 @@ export class ObsigraphSettingTab extends PluginSettingTab {
         }),
       );
 
-    const styles = new Setting(containerEl)
+    const typeStyles = new Setting(containerEl)
       .setName('Type styles')
       .setDesc('JSON keyed by type label: color, shape, icon (Lucide name) and label (property shown instead of the title). Schema notes and block headers override these per attribute. Example: {"Person": {"color": "#59a14f", "shape": "round-rectangle", "icon": "user"}}.');
-    const status = containerEl.createDiv({ cls: 'obsigraph-setting-status' });
-    styles.addTextArea((t) => {
-      t.inputEl.rows = 8;
-      t.inputEl.addClass('obsigraph-styles-input');
-      t.setValue(JSON.stringify(this.plugin.settings.typeStyles, null, 2)).onChange(async (v) => {
-        const parsed = parseTypeStyles(v);
-        if (typeof parsed === 'string') {
-          status.setText(parsed);
-          return;
-        }
-        status.setText('');
-        this.plugin.settings.typeStyles = parsed;
-        await this.plugin.saveSettings();
-      });
-    });
+    this.jsonEditor(typeStyles, 'typeStyles', 8);
 
     const edgeStyles = new Setting(containerEl)
       .setName('Edge styles')
       .setDesc('JSON keyed by edge type: color and line (solid, dashed, dotted). Negative edges are dashed red unless set here. Example: {"knows": {"color": "orange"}}.');
-    const edgeStatus = containerEl.createDiv({ cls: 'obsigraph-setting-status' });
-    edgeStyles.addTextArea((t) => {
-      t.inputEl.rows = 6;
-      t.inputEl.addClass('obsigraph-styles-input');
-      t.setValue(JSON.stringify(this.plugin.settings.edgeStyles, null, 2)).onChange(async (v) => {
-        const parsed = parseEdgeStyles(v);
-        if (typeof parsed === 'string') {
-          edgeStatus.setText(parsed);
-          return;
-        }
-        edgeStatus.setText('');
-        this.plugin.settings.edgeStyles = parsed;
-        await this.plugin.saveSettings();
-      });
-    });
+    this.jsonEditor(edgeStyles, 'edgeStyles', 6);
   }
 
   /**
