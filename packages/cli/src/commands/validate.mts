@@ -25,6 +25,7 @@ const RULES: Record<string, string> = {
   'missing-edge-property': 'A required edge property is absent',
   'edge-value-not-allowed': 'An edge property value is not one of its allowed values',
   'edge-syntax': 'A malformed edge line, property block or duplicate edge id',
+  'edge-property-link': 'An edge property value written like a wikilink that does not read as one',
   style: 'An invalid visualization value',
   embed: 'A malformed, ambiguous or unpinned edge embed',
   'ambiguous-link': 'A bare link matches both a Markdown and an AsciiDoc note; write the extension',

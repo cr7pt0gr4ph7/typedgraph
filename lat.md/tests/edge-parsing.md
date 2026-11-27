@@ -43,6 +43,14 @@ Edge syntax inside fenced code blocks, and inside YAML frontmatter, creates no e
 
 List-item edges and comma-separated links are recognized, with the shared props copied to every link and aliases and subpaths split out.
 
+## Link-shaped property value warns
+
+`{location: [[Location B]]}` still reads as a nested list but gives an `edge-property-link` warning whose range covers exactly the link text, also for links with subpaths and aliases inside a list (see [[edge-syntax#Links in property values]]).
+
+## Nested lists that are not links
+
+Quoted links, `[[X],]`, `[ [X] ]`, `[[X] ]` and `[[1, 2], [3]]` give no warning, because Obsidian does not highlight them as links either.
+
 ## Core has no host imports
 
 The core package source never imports `obsidian` and never touches DOM globals, so the sidecar can reuse it unchanged.

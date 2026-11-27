@@ -1,6 +1,22 @@
 export type PropValue = string | number | boolean | null | PropValue[];
 export type Props = Record<string, PropValue>;
 
+/** A value in a property block that is worth flagging but still parses, with its source range. */
+export interface PropsWarning {
+  message: string;
+  /** Offset of the first character, in the string given to `parseProps`. */
+  offset: number;
+  /** Offset just past the last character. */
+  end: number;
+}
+
+/**
+ * A wikilink as Obsidian highlights it: `[[`, then no bracket or line break, then `]]`.
+ * Sticky, so it only matches where `lastIndex` points.
+ */
+// @lat: [[edge-syntax#Links in property values]]
+export const PROPERTY_LINK = /\[\[[^[\]\r\n]*\]\]/y;
+
 // @tg: implements:: [[openspec:edge-parsing#Malformed property blocks]]
 export class PropsSyntaxError extends Error {
   constructor(
@@ -18,8 +34,10 @@ export class PropsSyntaxError extends Error {
  */
 // @tg: implements:: [[openspec:edge-parsing#Inline edge form]]
 // @tg: implements:: [[openspec:edge-parsing#Weight is independent of sign]]
-export function parseProps(src: string, start = 0): { props: Props; end: number } {
+// @tg: implements:: [[openspec:edge-parsing#Links in property values]]
+export function parseProps(src: string, start = 0): { props: Props; end: number; warnings: PropsWarning[] } {
   let i = start;
+  const warnings: PropsWarning[] = [];
 
   const fail = (msg: string): never => {
     throw new PropsSyntaxError(msg, i);
@@ -66,6 +84,16 @@ export function parseProps(src: string, start = 0): { props: Props; end: number 
     if (ch === undefined) fail('unexpected end of property block');
     if (ch === '"' || ch === "'") return parseString();
     if (ch === '[') {
+      PROPERTY_LINK.lastIndex = i;
+      const link = PROPERTY_LINK.exec(src)?.[0];
+      if (link) {
+        const quoted = JSON.stringify(link);
+        warnings.push({
+          offset: i,
+          end: i + link.length,
+          message: `${link} reads as a nested list, not a link; write ${quoted} for a link, or ${link.slice(0, -1)},] for a nested list`,
+        });
+      }
       i++;
       const items: PropValue[] = [];
       ws();
@@ -107,5 +135,5 @@ export function parseProps(src: string, start = 0): { props: Props; end: number 
     } else if (src[i] !== '}') fail("expected ',' or '}'");
   }
   i++;
-  return { props, end: i };
+  return { props, end: i, warnings };
 }
